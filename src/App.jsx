@@ -3,10 +3,6 @@ import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, XCircle, Award, Home, Play, TrendingUp, X, ChevronRight, Shield, Upload, Download, AlertCircle } from "lucide-react";
-import { db } from "./firebase";
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
-
-const COL = { employees:'employees', questions:'questions', exams:'exams', results:'results' };
 
 const EMPLOYEES_INIT = [];
 const QUESTIONS_INIT = [];
@@ -22,35 +18,63 @@ const Avatar = ({name, sz="md"}) => {
 const Badge = ({ok}) => <span className={`text-sm font-bold ${ok?'text-emerald-500':'text-red-400'}`}>{ok?'✓':'✗'}</span>;
 
 
-// ── SIDEBAR ──
+// ── SIDEBAR (desktop) + MOBILE NAV ──
 const Sidebar = ({role, active, setActive, user, onLogout}) => {
   const nav = role==='admin'
     ? [{id:'dashboard',ic:<Home size={17}/>,lb:'Tổng quan'},{id:'questions',ic:<BookOpen size={17}/>,lb:'Câu hỏi'},{id:'exams',ic:<FileText size={17}/>,lb:'Đề thi'},{id:'employees',ic:<Users size={17}/>,lb:'Nhân viên'}]
-    : [{id:'home',ic:<Home size={17}/>,lb:'Trang chủ'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả của tôi'}];
+    : [{id:'home',ic:<Home size={17}/>,lb:'Trang chủ'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả'}];
   return (
-    <div className="w-56 bg-red-950 h-screen flex flex-col fixed left-0 top-0 z-10">
-      <div className="p-4 border-b border-red-800/50 flex items-center gap-2.5">
-        <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center"><Shield size={15} className="text-white"/></div>
-        <div><div className="text-white font-bold text-sm leading-tight">Bệnh viện Quân y 4</div><div className="text-slate-400 text-xs">Hệ thống thi trắc nghiệm</div></div>
-      </div>
-      <nav className="flex-1 p-2.5 space-y-0.5">
-        {nav.map(i=>(
-          <button key={i.id} onClick={()=>setActive(i.id)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-all ${active===i.id?'bg-red-600 text-white':'text-slate-400 hover:text-white hover:bg-red-900'}`}>
-            {i.ic}<span>{i.lb}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="p-2.5 border-t border-red-800/50">
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <Avatar name={user.name} sz="sm"/>
-          <div className="flex-1 min-w-0">
-            <div className="text-white text-xs font-medium truncate">{user.name}</div>
-            <div className="text-slate-400 text-xs">{role==='admin'?'Quản trị viên':user.dept}</div>
+    <>
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex w-56 bg-red-950 h-screen flex-col fixed left-0 top-0 z-10">
+        <div className="p-4 border-b border-red-800/50 flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={15} className="text-white"/></div>
+          <div><div className="text-white font-bold text-sm leading-tight">Bệnh viện Quân y 4</div><div className="text-slate-400 text-xs">Hệ thống thi trắc nghiệm</div></div>
+        </div>
+        <nav className="flex-1 p-2.5 space-y-0.5">
+          {nav.map(i=>(
+            <button key={i.id} onClick={()=>setActive(i.id)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-all ${active===i.id?'bg-red-600 text-white':'text-slate-400 hover:text-white hover:bg-red-900'}`}>
+              {i.ic}<span>{i.lb}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="p-2.5 border-t border-red-800/50">
+          <div className="flex items-center gap-2 px-2 py-1.5">
+            <Avatar name={user.name} sz="sm"/>
+            <div className="flex-1 min-w-0">
+              <div className="text-white text-xs font-medium truncate">{user.name}</div>
+              <div className="text-slate-400 text-xs">{role==='admin'?'Quản trị viên':user.dept}</div>
+            </div>
+            <button onClick={onLogout} className="text-slate-400 hover:text-red-400"><LogOut size={14}/></button>
           </div>
-          <button onClick={onLogout} className="text-slate-400 hover:text-red-400"><LogOut size={14}/></button>
         </div>
       </div>
-    </div>
+
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-20 bg-red-950 flex items-center justify-between px-4 py-2.5 border-b border-red-800/50">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={13} className="text-white"/></div>
+          <div>
+            <div className="text-white font-bold text-xs leading-tight">Bệnh viện Quân y 4</div>
+            <div className="text-slate-400 text-[10px]">Hệ thống thi trắc nghiệm</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-white text-xs">{user.name.split(' ').pop()}</span>
+          <button onClick={onLogout} className="text-slate-400 hover:text-red-300 p-1"><LogOut size={15}/></button>
+        </div>
+      </div>
+
+      {/* Mobile bottom nav */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-red-950 border-t border-red-800/50 flex">
+        {nav.map(i=>(
+          <button key={i.id} onClick={()=>setActive(i.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-all ${active===i.id?'text-red-400':'text-slate-500'}`}>
+            {i.ic}
+            <span className="text-[10px]">{i.lb}</span>
+          </button>
+        ))}
+      </div>
+    </>
   );
 };
 
@@ -71,7 +95,7 @@ const Dashboard = ({results, exams, questions, employees}) => {
   return (
     <div>
       <div className="mb-4"><h1 className="text-lg md:text-xl font-bold text-slate-800">Tổng quan</h1><p className="text-slate-500 text-xs md:text-sm mt-0.5">Thống kê hệ thống thi trắc nghiệm nội bộ</p></div>
-      <div className="grid grid-cols-4 gap-2 md:gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-4">
         {stats.map((s,i)=>(
           <div key={i} className="bg-white rounded-xl p-3 md:p-4 shadow-sm border border-slate-100 flex items-center gap-3">
             <div className={`w-10 h-10 ${s.col} rounded-lg flex items-center justify-center flex-shrink-0`}>{s.ic}</div>
@@ -83,7 +107,7 @@ const Dashboard = ({results, exams, questions, employees}) => {
         ))}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <div className="md:col-span-2 bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+        <div className="md:lg:col-span-2 bg-white rounded-xl p-4 shadow-sm border border-slate-100">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">Điểm TB theo đề thi</h3>
           <ResponsiveContainer width="100%" height={150}>
             <BarChart data={barData} margin={{left:-20,right:10}}>
@@ -124,7 +148,7 @@ const Dashboard = ({results, exams, questions, employees}) => {
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-700">Kết quả gần đây</h3></div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px]">
+          <table className="w-full min-w-[480px]">
             <thead><tr className="bg-slate-50">{['Nhân viên','Phòng ban','Đề thi','Điểm','Kết quả','Thời gian','Ngày'].map(h=><th key={h} className={`px-3 py-2 text-xs font-medium text-slate-400 uppercase ${h==='Kết quả'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
             <tbody>
               {recent.map(r=>{
@@ -276,7 +300,7 @@ LƯU Ý:
       {/* Preview modal */}
       {previewList && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-xl w-full max-h-[85vh] flex flex-col shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b">
               <div>
                 <h2 className="font-bold text-slate-800">Xem trước câu hỏi import</h2>
@@ -311,8 +335,8 @@ LƯU Ý:
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-5">
-        <div><h1 className="text-xl font-bold text-slate-800">Ngân hàng câu hỏi</h1><p className="text-slate-500 text-sm">{questions.length} câu hỏi</p></div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+        <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Ngân hàng câu hỏi</h1><p className="text-slate-500 text-sm">{questions.length} câu hỏi</p></div>
         <div className="flex gap-2">
           <button onClick={downloadWordTemplate} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
             <Download size={14}/>File mẫu
@@ -417,8 +441,8 @@ const Exams = ({exams, setExams, questions}) => {
   };
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
-        <div><h1 className="text-xl font-bold text-slate-800">Quản lý đề thi</h1><p className="text-slate-500 text-sm">{exams.length} đề thi</p></div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+        <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Quản lý đề thi</h1><p className="text-slate-500 text-sm">{exams.length} đề thi</p></div>
         <button onClick={()=>setModal(true)} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium"><Plus size={15}/>Tạo đề thi</button>
       </div>
       {modal && (
@@ -598,7 +622,7 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
       {/* Modal Thêm / Sửa */}
       {(modal?.mode==='add' || modal?.mode==='edit') && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-md w-full shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b">
               <h2 className="font-bold text-slate-800">{modal.mode==='add'?'Thêm nhân viên mới':'Chỉnh sửa nhân viên'}</h2>
               <button onClick={closeModal} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
@@ -653,7 +677,7 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
       {/* Modal Xóa */}
       {modal?.mode==='delete' && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6">
+          <div className="bg-white rounded-2xl w-full max-w-sm sm:max-w-sm w-full shadow-2xl p-6">
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Trash2 size={20} className="text-red-500"/>
             </div>
@@ -670,12 +694,12 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center"><Users size={22} className="text-red-600"/></div>
-          <div><h1 className="text-xl font-bold text-slate-800">Nhân viên</h1><p className="text-slate-500 text-xs">{employees.length} nhân viên</p></div>
+          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Nhân viên</h1><p className="text-slate-500 text-xs">{employees.length} nhân viên</p></div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50"><Download size={14}/>Tải file mẫu</button>
           <button onClick={()=>fileRef.current.click()} disabled={importing} className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-60"><Upload size={14}/>{importing?'Đang import...':'Import Excel'}</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport}/>
@@ -694,7 +718,7 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
           {ic:<Users size={18}/>, val:employees.length, lb:'Tổng nhân viên', col:'bg-red-100 text-red-600'},
           {ic:<CheckCircle size={18}/>, val:<span>{totalPassed} <span className="text-xs font-normal text-slate-400">{passRate}%</span></span>, lb:'Đạt', col:'bg-emerald-100 text-emerald-600'},
@@ -709,7 +733,7 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
       </div>
 
       {/* Dept filter tabs + search */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 flex-wrap gap-2">
         <div className="flex gap-2 flex-wrap">
           {deptCounts.map(({dept,count})=>(
             <button key={dept} onClick={()=>{setActiveDept(dept);setPage(1);}}
@@ -725,8 +749,8 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto">
+        <table className="w-full min-w-[640px]">
           <thead>
             <tr className="border-b border-slate-100">
               {['Nhân viên','Lượt thi','Đạt','Điểm TB','Kết quả gần nhất','Thao tác'].map(h=>(
@@ -907,10 +931,10 @@ const Reports = ({results, exams, employees}) => {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center"><TrendingUp size={20} className="text-red-600"/></div>
-          <div><h1 className="text-xl font-bold text-slate-800">Báo cáo & Phân tích</h1><p className="text-slate-500 text-xs">Phân tích kết quả thi theo phòng ban</p></div>
+          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Báo cáo & Phân tích</h1><p className="text-slate-500 text-xs">Phân tích kết quả thi theo phòng ban</p></div>
         </div>
         <button onClick={exportExcel} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium">
           <Download size={15}/>Xuất Excel <ChevronRight size={14} className="rotate-90"/>
@@ -918,7 +942,7 @@ const Reports = ({results, exams, employees}) => {
       </div>
 
       {/* Stat cards with sparklines */}
-      <div className="grid grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
           {ic:<BarChart2 size={18}/>, val:depts.length, lb:'Phòng ban', sub:'Đã có dữ liệu', icCol:'bg-red-100 text-red-600', spark:'#fca5a5', path:'M0,20 C10,15 20,25 30,18 C40,10 50,22 60,16 C70,10 80,20 90,14'},
           {ic:<CheckCircle size={18}/>, val:totalAttempts, lb:'Tổng lượt thi', sub:'Trong kỳ', icCol:'bg-emerald-100 text-emerald-600', spark:'#6ee7b7', path:'M0,22 C15,18 25,24 40,16 C55,8 65,20 80,14 C85,12 88,16 90,13'},
@@ -942,10 +966,10 @@ const Reports = ({results, exams, employees}) => {
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-5 gap-4 mb-5">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
         {/* Bar chart */}
-        <div className="col-span-3 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-4">
+        <div className="md:lg:col-span-3 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-slate-700">So sánh điểm trung bình theo phòng ban</h3>
               <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center cursor-help" title="Điểm trung bình của tất cả lần thi trong kỳ">
@@ -978,7 +1002,7 @@ const Reports = ({results, exams, employees}) => {
         </div>
 
         {/* Donut chart */}
-        <div className="col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+        <div className="md:lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">Phân bố kết quả</h3>
           <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
@@ -1233,9 +1257,9 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
           <span className="text-slate-400 text-xs">{cur+1}/{qs.length}</span>
         </div>
       </div>
-      <div className="flex flex-1 gap-5 p-6">
+      <div className="flex flex-1 gap-4 p-3 md:p-6">
         <div className="flex-1">
-          <div className="bg-white rounded-2xl p-6 mb-4">
+          <div className="bg-white rounded-2xl p-4 md:p-6 mb-4">
             <div className="flex items-center gap-2 mb-4">
               <span className="px-2.5 py-1 bg-red-50 text-red-700 rounded-lg text-xs font-medium">Câu {cur+1}</span>
             </div>
@@ -1260,7 +1284,7 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
         <div className="w-48 flex-shrink-0">
           <div className="bg-white rounded-2xl p-4">
             <div className="text-sm font-semibold text-slate-700 mb-3">Bảng câu hỏi</div>
-            <div className="grid grid-cols-4 gap-1.5 mb-4">
+            <div className="grid grid-cols-5 sm:grid-cols-4 gap-1.5 mb-4">
               {qs.map((_,i)=>(
                 <button key={i} onClick={()=>setCur(i)} className={`w-9 h-9 rounded-lg text-xs font-medium transition-all ${i===cur?'bg-red-600 text-white':ans[i]!==-1?'bg-emerald-100 text-emerald-700 border border-emerald-200':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{i+1}</button>
               ))}
@@ -1297,7 +1321,7 @@ const ResultScreen = ({result, exam, questions, onBack}) => {
   const ok = result.score>=exam.pass;
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="max-w-2xl mx-auto p-4 md:p-6">
         <div className={`rounded-2xl p-8 text-center mb-6 text-white ${ok?'bg-red-500':'bg-red-500'}`}>
           <div className="text-5xl mb-3">{ok?'🎉':'😔'}</div>
           <div className="text-4xl font-bold mb-1">{result.score}%</div>
@@ -1354,7 +1378,7 @@ const Login = ({onLogin, employees}) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm sm:max-w-sm">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-600/25"><Shield size={28} className="text-white"/></div>
           <h1 className="text-2xl font-bold text-white">Bệnh viện Quân y 4</h1>
@@ -1473,98 +1497,44 @@ const Login = ({onLogin, employees}) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('dashboard');
-  const [employees, setEmployees] = useState([]);
-  const [questions, setQuestions] = useState([]);
-  const [exams, setExams] = useState([]);
-  const [results, setResults] = useState([]);
+  const [employees, setEmployees] = useState(EMPLOYEES_INIT);
+  const [questions, setQuestions] = useState(QUESTIONS_INIT);
+  const [exams, setExams] = useState(EXAMS_INIT);
+  const [results, setResults] = useState(RESULTS_INIT);
   const [activeExam, setActiveExam] = useState(null);
   const [lastResult, setLastResult] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  // ── Load realtime từ Firebase ──
-  useEffect(() => {
-    const unsubs = [];
-    let loadCount = 0;
-    const TOTAL = 4;
-    const sub = (colName, setter) => {
-      let first = true;
-      const unsub = onSnapshot(collection(db, colName), snap => {
-        setter(snap.docs.map(d => ({ ...d.data(), id: d.data().id || d.id })));
-        if (first) { first = false; loadCount++; if (loadCount >= TOTAL) setLoading(false); }
-      });
-      unsubs.push(unsub);
-    };
-    sub(COL.employees, setEmployees);
-    sub(COL.questions, setQuestions);
-    sub(COL.exams, setExams);
-    sub(COL.results, setResults);
-    return () => unsubs.forEach(u => u());
-  }, []);
-
-  // ── Firebase write helpers ──
-  const fbSet = (colName, item) => setDoc(doc(db, colName, String(item.id)), item);
-  const fbDel = (colName, id) => deleteDoc(doc(db, colName, String(id)));
-
-  // Ghi thông minh: chỉ set/delete doc thực sự thay đổi
-  const makeSyncSetter = (colName, localSetter) => (updater) => {
-    localSetter(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      next.forEach(item => {
-        const old = prev.find(e => e.id === item.id);
-        if (!old || JSON.stringify(old) !== JSON.stringify(item)) fbSet(colName, item);
-      });
-      prev.forEach(item => { if (!next.find(e => e.id === item.id)) fbDel(colName, item.id); });
-      return next;
-    });
-  };
-
-  const setEmployeesSync = makeSyncSetter(COL.employees, setEmployees);
-  const setQuestionsSync = makeSyncSetter(COL.questions, setQuestions);
-  const setExamsSync     = makeSyncSetter(COL.exams, setExams);
-
-  const login   = u => { setUser(u); setView(u.role==='admin'?'dashboard':'home'); };
-  const logout  = () => { setUser(null); setActiveExam(null); setLastResult(null); };
+  const login = u => { setUser(u); setView(u.role==='admin'?'dashboard':'home'); };
+  const logout = () => { setUser(null); setActiveExam(null); setLastResult(null); };
   const startExam = exam => { setActiveExam(exam); setLastResult(null); };
-  const finishExam = async r => {
-    await fbSet(COL.results, r);
-    setLastResult(r);
-    setActiveExam(null);
-  };
+  const finishExam = r => { setResults(p=>[...p,r]); setLastResult(r); setActiveExam(null); };
 
-  if (loading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <Shield size={26} className="text-white"/>
-        </div>
-        <p className="text-slate-500 text-sm">Đang tải dữ liệu...</p>
-      </div>
-    </div>
-  );
+  if(!user) return <Login onLogin={login} employees={employees}/>;
 
-  if (!user) return <Login onLogin={login} employees={employees}/>;
-  if (activeExam) return <ExamScreen user={user} exam={activeExam} questions={questions} onFinish={finishExam}/>;
-  if (lastResult) {
+  if(activeExam) return <ExamScreen user={user} exam={activeExam} questions={questions} onFinish={finishExam}/>;
+
+  if(lastResult) {
     const exam = exams.find(e=>e.id===lastResult.examId);
     return <ResultScreen result={lastResult} exam={exam} questions={questions} onBack={()=>{setLastResult(null);setView('home');}}/>;
   }
 
   const adminViews = {
-    dashboard: <Reports results={results} exams={exams} employees={employees}/>,
-    questions: <Questions questions={questions} setQuestions={setQuestionsSync}/>,
-    exams:     <Exams exams={exams} setExams={setExamsSync} questions={questions}/>,
-    employees: <EmployeesView employees={employees} setEmployees={setEmployeesSync} results={results} exams={exams}/>,
+    dashboard:<Reports results={results} exams={exams} employees={employees}/>,
+    questions:<Questions questions={questions} setQuestions={setQuestions}/>,
+    exams:<Exams exams={exams} setExams={setExams} questions={questions}/>,
+    employees:<EmployeesView employees={employees} setEmployees={setEmployees} results={results} exams={exams}/>,
+    reports:<Reports results={results} exams={exams} employees={employees}/>,
   };
   const empViews = {
-    home:    <EmpHome user={user} exams={exams} results={results} onStart={startExam}/>,
-    results: <MyResults user={user} exams={exams} results={results}/>,
+    home:<EmpHome user={user} exams={exams} results={results} onStart={startExam}/>,
+    results:<MyResults user={user} exams={exams} results={results}/>,
   };
 
   return (
     <div className="flex bg-slate-50 min-h-screen">
       <Sidebar role={user.role} active={view} setActive={setView} user={user} onLogout={logout}/>
-      <div className="flex-1 ml-56 overflow-auto">
-        <div className="p-7">{user.role==='admin'?adminViews[view]:empViews[view]}</div>
+      <div className="flex-1 md:ml-56 overflow-auto pt-14 md:pt-0 pb-16 md:pb-0">
+        <div className="p-3 sm:p-4 md:p-7">{user.role==='admin'?adminViews[view]:empViews[view]}</div>
       </div>
     </div>
   );
