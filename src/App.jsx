@@ -3,6 +3,10 @@ import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, XCircle, Award, Home, Play, TrendingUp, X, ChevronRight, Shield, Upload, Download, AlertCircle } from "lucide-react";
+import { db } from "./firebase";
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
+
+const COL = { employees:'employees', questions:'questions', exams:'exams', results:'results' };
 
 const EMPLOYEES_INIT = [];
 const QUESTIONS_INIT = [];
@@ -1497,44 +1501,97 @@ const Login = ({onLogin, employees}) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('dashboard');
-  const [employees, setEmployees] = useState(EMPLOYEES_INIT);
-  const [questions, setQuestions] = useState(QUESTIONS_INIT);
-  const [exams, setExams] = useState(EXAMS_INIT);
-  const [results, setResults] = useState(RESULTS_INIT);
+  const [employees, setEmployees] = useState([]);
+  const [questions, setQuestions] = useState([]);
+  const [exams, setExams] = useState([]);
+  const [results, setResults] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [lastResult, setLastResult] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = u => { setUser(u); setView(u.role==='admin'?'dashboard':'home'); };
-  const logout = () => { setUser(null); setActiveExam(null); setLastResult(null); };
+  // ── Realtime sync từ Firebase ──
+  useEffect(() => {
+    const unsubs = [];
+    let loadCount = 0;
+    const TOTAL = 4;
+    const sub = (colName, setter) => {
+      let first = true;
+      const unsub = onSnapshot(collection(db, colName), snap => {
+        setter(snap.docs.map(d => ({ ...d.data(), id: d.data().id || d.id })));
+        if (first) { first = false; loadCount++; if (loadCount >= TOTAL) setLoading(false); }
+      });
+      unsubs.push(unsub);
+    };
+    sub(COL.employees, setEmployees);
+    sub(COL.questions, setQuestions);
+    sub(COL.exams, setExams);
+    sub(COL.results, setResults);
+    return () => unsubs.forEach(u => u());
+  }, []);
+
+  // ── Firebase write helpers ──
+  const fbSet = (colName, item) => setDoc(doc(db, colName, String(item.id)), item);
+  const fbDel = (colName, id)  => deleteDoc(doc(db, colName, String(id)));
+
+  const makeSyncSetter = (colName, localSetter) => (updater) => {
+    localSetter(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      next.forEach(item => {
+        const old = prev.find(e => e.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) fbSet(colName, item);
+      });
+      prev.forEach(item => { if (!next.find(e => e.id === item.id)) fbDel(colName, item.id); });
+      return next;
+    });
+  };
+
+  const setEmployeesSync = makeSyncSetter(COL.employees, setEmployees);
+  const setQuestionsSync = makeSyncSetter(COL.questions, setQuestions);
+  const setExamsSync     = makeSyncSetter(COL.exams, setExams);
+
+  const login     = u => { setUser(u); setView(u.role==="admin"?"dashboard":"home"); };
+  const logout    = () => { setUser(null); setActiveExam(null); setLastResult(null); };
   const startExam = exam => { setActiveExam(exam); setLastResult(null); };
-  const finishExam = r => { setResults(p=>[...p,r]); setLastResult(r); setActiveExam(null); };
+  const finishExam = async r => {
+    await fbSet(COL.results, r);
+    setLastResult(r);
+    setActiveExam(null);
+  };
 
-  if(!user) return <Login onLogin={login} employees={employees}/>;
+  if (loading) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <Shield size={26} className="text-white"/>
+        </div>
+        <p className="text-slate-500 text-sm">Đang tải dữ liệu...</p>
+      </div>
+    </div>
+  );
 
-  if(activeExam) return <ExamScreen user={user} exam={activeExam} questions={questions} onFinish={finishExam}/>;
-
-  if(lastResult) {
+  if (!user) return <Login onLogin={login} employees={employees}/>;
+  if (activeExam) return <ExamScreen user={user} exam={activeExam} questions={questions} onFinish={finishExam}/>;
+  if (lastResult) {
     const exam = exams.find(e=>e.id===lastResult.examId);
-    return <ResultScreen result={lastResult} exam={exam} questions={questions} onBack={()=>{setLastResult(null);setView('home');}}/>;
+    return <ResultScreen result={lastResult} exam={exam} questions={questions} onBack={()=>{setLastResult(null);setView("home");}}/>;
   }
 
   const adminViews = {
-    dashboard:<Reports results={results} exams={exams} employees={employees}/>,
-    questions:<Questions questions={questions} setQuestions={setQuestions}/>,
-    exams:<Exams exams={exams} setExams={setExams} questions={questions}/>,
-    employees:<EmployeesView employees={employees} setEmployees={setEmployees} results={results} exams={exams}/>,
-    reports:<Reports results={results} exams={exams} employees={employees}/>,
+    dashboard: <Reports results={results} exams={exams} employees={employees}/>,
+    questions: <Questions questions={questions} setQuestions={setQuestionsSync}/>,
+    exams:     <Exams exams={exams} setExams={setExamsSync} questions={questions}/>,
+    employees: <EmployeesView employees={employees} setEmployees={setEmployeesSync} results={results} exams={exams}/>,
   };
   const empViews = {
-    home:<EmpHome user={user} exams={exams} results={results} onStart={startExam}/>,
-    results:<MyResults user={user} exams={exams} results={results}/>,
+    home:    <EmpHome user={user} exams={exams} results={results} onStart={startExam}/>,
+    results: <MyResults user={user} exams={exams} results={results}/>,
   };
 
   return (
     <div className="flex bg-slate-50 min-h-screen">
       <Sidebar role={user.role} active={view} setActive={setView} user={user} onLogout={logout}/>
       <div className="flex-1 md:ml-56 overflow-auto pt-14 md:pt-0 pb-16 md:pb-0">
-        <div className="p-3 sm:p-4 md:p-7">{user.role==='admin'?adminViews[view]:empViews[view]}</div>
+        <div className="p-3 sm:p-4 md:p-7">{user.role==="admin"?adminViews[view]:empViews[view]}</div>
       </div>
     </div>
   );
