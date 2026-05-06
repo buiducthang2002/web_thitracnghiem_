@@ -631,7 +631,7 @@ const downloadTemplate = () => {
 
   const deptCounts = depts.map(d=>({dept:d, count:employees.filter(e=>e.dept===d).length}));
   const filtered = employees.filter(e=>{
-    const matchDept = activeDept==='all' || e.dept===activeDept;
+    const matchDept = search ? true : (activeDept==='all' || e.dept===activeDept);
     const matchSearch = e.name.toLowerCase().includes(search.toLowerCase());
     return matchDept && matchSearch;
   });
