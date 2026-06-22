@@ -207,62 +207,56 @@ const Questions = ({questions, setQuestions}) => {
   const parseWordText = (text) => {
     const parsed = [];
     let skipped = 0;
-    // Normalize line breaks then split into blocks at each "Câu N" marker
-    const norm = text.replace(/\r\n?/g, '\n');
+    let norm = text.replace(/\r\n?/g, '\n');
+    // Detach an option marker glued right after sentence punctuation ("...?A. xxx")
+    norm = norm.replace(/([?”’"):.])(?=[A-Da-d]\s*[\.\)]\s)/g, '$1\n');
+    // Split into blocks at each "Câu N" marker
     const blocks = norm.split(/\n(?=\s*Câu\s*\d+\s*[\.\:\)])/i).filter(b=>b.trim());
-    // When Word lays options out in a table / 2-column grid, mammoth puts two
-    // options on one line ("A. xxx  B. yyy"). Split such a line at each inline
-    // option marker or meta marker so every option ends up on its own line.
+    // Word often lays options out in a table / 2-column grid, so mammoth puts two
+    // options on one line ("A. xxx  B. yyy"). Split every line at each inline
+    // option marker or meta marker so each option/meta lands on its own line.
     const splitRe = /\s+(?=(?:[A-Da-d]\s*[\.\)]\s)|(?:Đáp\s*án(?:\s*đúng)?|ĐA|Chủ\s*đề|Mức\s*độ)\s*[:\.\-])/i;
     for(const block of blocks) {
       const lines = [];
       for(const raw of block.split('\n')) {
         const t = raw.trim();
         if(!t) continue;
-        // Only explode lines that begin with an option marker (never the question text)
-        if(/^[A-Da-d]\s*[\.\)]/.test(t))
-          t.split(splitRe).forEach(s=>{ const x=s.trim(); if(x) lines.push(x); });
-        else
-          lines.push(t);
+        t.split(splitRe).forEach(s=>{ const x=s.trim(); if(x) lines.push(x); });
       }
       if(lines.length < 2) { skipped++; continue; }
 
-      const opts = [];
       let ansIdx = -1;
       let topic = 'Nội quy';
       let level = 'Dễ';
-      let qParts = [];
-      // "cursor" points to where continuation lines get appended:
-      //   'q' = question text, number = option index, null = ignore
-      let cursor = 'q';
-
-      // First line: strip the "Câu N:" prefix, keep any remaining text as question start
-      const firstRest = lines[0].replace(/^\s*Câu\s*\d+\s*[\.\:\)]\s*/i,'').trim();
-      if(firstRest) qParts.push(firstRest);
-
+      // Question text = first line with the "Câu N:" prefix stripped
+      const qText = lines[0].replace(/^\s*Câu\s*\d+\s*[\.\:\)]\s*/i,'').trim();
+      // Collect candidate option lines (everything after the question that isn't meta)
+      const cand = [];
       for(let i=1;i<lines.length;i++){
         const l = lines[i];
-        // Option marker: A. / B) / a. ...
-        const optMatch = l.match(/^([A-Da-d])\s*[\.\)]\s*(.*)/);
-        if(optMatch){ opts.push(optMatch[2].trim()); cursor = opts.length-1; continue; }
-        // Answer: "Đáp án: B" / "ĐA: B" / "Đáp án đúng: B"
         const ansMatch = l.match(/^(?:Đáp\s*án(?:\s*đúng)?|ĐA)\s*[:\.\-]\s*([A-Da-d])/i);
-        if(ansMatch){ ansIdx = 'abcd'.indexOf(ansMatch[1].toLowerCase()); cursor = null; continue; }
-        // Topic
+        if(ansMatch){ ansIdx = 'abcd'.indexOf(ansMatch[1].toLowerCase()); continue; }
         const topicMatch = l.match(/^Chủ\s*đề\s*[:\.\-]\s*(.+)/i);
-        if(topicMatch){ topic = topicMatch[1].trim(); cursor = null; continue; }
-        // Level
+        if(topicMatch){ topic = topicMatch[1].trim(); continue; }
         const lvlMatch = l.match(/^Mức\s*độ\s*[:\.\-]\s*(.+)/i);
-        if(lvlMatch){ level = lvlMatch[1].trim(); cursor = null; continue; }
-        // Otherwise it's a continuation of the question or current option (wrapped line)
-        if(cursor === 'q') qParts.push(l);
-        else if(typeof cursor === 'number' && opts[cursor] !== undefined)
-          opts[cursor] = (opts[cursor] + ' ' + l).trim();
+        if(lvlMatch){ level = lvlMatch[1].trim(); continue; }
+        cand.push(l);
       }
-
-      const qText = qParts.join(' ').trim();
-      // Keep a question only if it has text, EXACTLY 4 options, and a valid answer index
-      if(qText && opts.length === 4 && ansIdx >= 0 && ansIdx < 4)
+      // Assign candidate lines to option slots A..D by position. An explicit
+      // "A./B./C./D." label resyncs the slot, so options that lost their label
+      // (or are glued onto another line) still land in the right place.
+      const slots = [];
+      let next = 0;
+      for(const c of cand){
+        const m = c.match(/^([A-Da-d])\s*[\.\)]\s*(.*)/);
+        if(m){ const idx = 'abcd'.indexOf(m[1].toLowerCase()); slots[idx] = (m[2]||'').trim(); next = idx+1; }
+        else { slots[next] = c; next++; }
+      }
+      // Take options contiguously from slot A so the answer index stays aligned
+      const opts = [];
+      for(let k=0;k<4;k++){ if(!slots[k] || !slots[k].trim()) break; opts.push(slots[k].trim()); }
+      // Keep a question if it has text, 2-4 options, and a valid answer pointing at a real option
+      if(qText && opts.length >= 2 && opts.length <= 4 && ansIdx >= 0 && ansIdx < opts.length)
         parsed.push({id:Date.now()+Math.random(), text:qText, opts, ans:ansIdx, topic, level});
       else
         skipped++;
@@ -278,9 +272,9 @@ const Questions = ({questions, setQuestions}) => {
       const result = await mammoth.extractRawText({arrayBuffer});
       const {parsed, skipped} = parseWordText(result.value);
       if(parsed.length===0){
-        setImportResult({error:'Không tìm thấy câu hỏi hợp lệ nào. Mỗi câu cần có nội dung, đủ 4 đáp án (A, B, C, D) và dòng "Đáp án: X". Vui lòng kiểm tra lại định dạng file.'});
+        setImportResult({error:'Không tìm thấy câu hỏi hợp lệ nào. Mỗi câu cần có nội dung, từ 2 đến 4 đáp án (A, B, C, D) và dòng "Đáp án: X". Vui lòng kiểm tra lại định dạng file.'});
       } else {
-        if(skipped>0) setImportResult({error:`Lưu ý: có ${skipped} câu bị bỏ qua do không đủ 4 đáp án hoặc thiếu dòng "Đáp án: X".`});
+        if(skipped>0) setImportResult({error:`Lưu ý: có ${skipped} câu bị bỏ qua do thiếu đáp án (cần 2-4 đáp án) hoặc thiếu dòng "Đáp án: X".`});
         setPreviewList(parsed);
       }    } catch(err) {
       setImportResult({error:'Không đọc được file Word. Vui lòng dùng định dạng .docx — lỗi: ' + err.message});
