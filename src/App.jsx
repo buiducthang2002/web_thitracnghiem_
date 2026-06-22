@@ -1553,15 +1553,39 @@ const Login = ({onLogin, employees}) => {
 
 // ── MAIN APP ──
 // ── EXAM RESULTS (admin): pick an exam → list every attempt for it ──
-const ExamResults = ({results, exams, employees}) => {
+const ExamResults = ({results, exams, employees, onClearAll}) => {
   const [selId, setSelId] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
   const fmtTime = (t) => t!=null ? `${Math.floor(t/60)}p${String(t%60).padStart(2,'0')}s` : '--';
+
+  // Confirmation dialog for wiping every result
+  const clearModal = confirmClear && (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5">
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0"><AlertCircle size={18} className="text-red-600"/></div>
+          <h2 className="font-bold text-slate-800">Xóa tất cả kết quả thi?</h2>
+        </div>
+        <p className="text-sm text-slate-600 mb-4">Toàn bộ <span className="font-semibold text-red-600">{results.length} lượt thi</span> của tất cả đề thi sẽ bị xóa vĩnh viễn và <span className="font-semibold">không thể khôi phục</span>. Câu hỏi, đề thi và nhân viên không bị ảnh hưởng.</p>
+        <div className="flex gap-2">
+          <button onClick={()=>setConfirmClear(false)} className="flex-1 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
+          <button onClick={()=>{onClearAll&&onClearAll(); setConfirmClear(false); setSelId(null);}} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Xóa tất cả</button>
+        </div>
+      </div>
+    </div>
+  );
 
   // Step 1 — choose an exam
   if(selId==null){
     return (
       <div>
-        <div className="mb-4"><h1 className="text-lg md:text-xl font-bold text-slate-800">Kết quả thi</h1><p className="text-slate-500 text-xs md:text-sm mt-0.5">Chọn một đề thi để xem danh sách người thi và kết quả</p></div>
+        {clearModal}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Kết quả thi</h1><p className="text-slate-500 text-xs md:text-sm mt-0.5">Chọn một đề thi để xem danh sách người thi và kết quả</p></div>
+          {results.length>0 && (
+            <button onClick={()=>setConfirmClear(true)} className="flex items-center gap-2 border border-red-200 text-red-600 px-3 py-2 rounded-lg hover:bg-red-50 text-sm font-medium self-start"><Trash2 size={15}/>Xóa tất cả kết quả</button>
+          )}
+        </div>
         {exams.length===0 ? (
           <div className="bg-white rounded-xl p-8 text-center text-slate-400 border border-slate-100">Chưa có đề thi nào.</div>
         ) : (
@@ -1704,6 +1728,7 @@ export default function App() {
   const setEmployeesSync = makeSyncSetter(COL.employees, setEmployees);
   const setQuestionsSync = makeSyncSetter(COL.questions, setQuestions);
   const setExamsSync     = makeSyncSetter(COL.exams, setExams);
+  const setResultsSync   = makeSyncSetter(COL.results, setResults);
 
   const login     = u => { setUser(u); setView(u.role==="admin"?"dashboard":"home"); };
   const logout    = () => { setUser(null); setActiveExam(null); setLastResult(null); };
@@ -1736,7 +1761,7 @@ export default function App() {
     dashboard: <Reports results={results} exams={exams} employees={employees}/>,
     questions: <Questions questions={questions} setQuestions={setQuestionsSync}/>,
     exams:     <Exams exams={exams} setExams={setExamsSync} questions={questions}/>,
-    results:   <ExamResults results={results} exams={exams} employees={employees}/>,
+    results:   <ExamResults results={results} exams={exams} employees={employees} onClearAll={()=>setResultsSync([])}/>,
     employees: <EmployeesView employees={employees} setEmployees={setEmployeesSync} results={results} exams={exams}/>,
   };
   const empViews = {
