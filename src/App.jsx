@@ -21,6 +21,13 @@ const Avatar = ({name, sz="md"}) => {
 };
 const Badge = ({ok}) => <span className={`text-sm font-bold ${ok?'text-emerald-500':'text-red-400'}`}>{ok?'✓':'✗'}</span>;
 
+// Stable question order: by explicit `order`; legacy questions without one keep id order and stay first
+const orderedQuestions = (qs) => [...qs].sort((a,b)=>{
+  if(a.order!=null && b.order!=null) return a.order-b.order;
+  if(a.order==null && b.order==null) return (a.id||0)-(b.id||0);
+  return a.order==null ? -1 : 1;
+});
+
 
 // ── SIDEBAR (desktop) + MOBILE NAV ──
 const Sidebar = ({role, active, setActive, user, onLogout}) => {
@@ -197,7 +204,7 @@ const Questions = ({questions, setQuestions}) => {
   const add = () => {
     if(!nq.text.trim()||nq.opts.some(o=>!o.trim())) return;
     if(!effectiveTopic) return;
-    setQuestions(p=>[...p,{...nq, topic:effectiveTopic, id:Date.now()}]);
+    setQuestions(p=>[...p,{...nq, topic:effectiveTopic, id:Date.now(), order: p.reduce((m,q)=>Math.max(m, q.order||0), 0) + 1}]);
     setModal(false);
     setNq({topic:'Nội quy',level:'Dễ',text:'',opts:['','','',''],ans:0});
     setCustomTopic('');
@@ -284,7 +291,12 @@ const Questions = ({questions, setQuestions}) => {
   };
 
   const confirmImport = () => {
-    setQuestions(p=>[...p,...previewList]);
+    setQuestions(p=>{
+      // Append imported questions after existing ones with a continuous order
+      const base = p.reduce((m,q)=>Math.max(m, q.order||0), 0);
+      const ordered = previewList.map((q,i)=>({...q, order: base + i + 1}));
+      return [...p, ...ordered];
+    });
     setImportResult({added:previewList.length});
     setPreviewList(null);
     setTimeout(()=>setImportResult(null), 2000);
@@ -435,7 +447,7 @@ LƯU Ý:
         </div>
       )}
       <div className="space-y-3">
-        {questions.map((q,idx)=>(
+        {orderedQuestions(questions).map((q,idx)=>(
           <div key={q.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
@@ -496,7 +508,7 @@ const Exams = ({exams, setExams, questions}) => {
               </div>
               <div><label className="text-xs font-medium text-slate-600 mb-2 block">Chọn câu hỏi ({ne.qIds.length} đã chọn)</label>
                 <div className="space-y-1 max-h-48 overflow-y-auto border border-slate-100 rounded-xl p-2">
-                  {questions.map(q=>(
+                  {orderedQuestions(questions).map(q=>(
                     <label key={q.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
                       <input type="checkbox" className="mt-0.5 flex-shrink-0" checked={ne.qIds.includes(q.id)} onChange={()=>toggleQ(q.id)}/>
                       <div><p className="text-xs text-slate-700">{q.text}</p></div>
