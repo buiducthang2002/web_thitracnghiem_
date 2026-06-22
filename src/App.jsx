@@ -25,7 +25,7 @@ const Badge = ({ok}) => <span className={`text-sm font-bold ${ok?'text-emerald-5
 // ── SIDEBAR (desktop) + MOBILE NAV ──
 const Sidebar = ({role, active, setActive, user, onLogout}) => {
   const nav = role==='admin'
-    ? [{id:'dashboard',ic:<Home size={17}/>,lb:'Tổng quan'},{id:'questions',ic:<BookOpen size={17}/>,lb:'Câu hỏi'},{id:'exams',ic:<FileText size={17}/>,lb:'Đề thi'},{id:'employees',ic:<Users size={17}/>,lb:'Nhân viên'}]
+    ? [{id:'dashboard',ic:<Home size={17}/>,lb:'Tổng quan'},{id:'questions',ic:<BookOpen size={17}/>,lb:'Câu hỏi'},{id:'exams',ic:<FileText size={17}/>,lb:'Đề thi'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả'},{id:'employees',ic:<Users size={17}/>,lb:'Nhân viên'}]
     : [{id:'home',ic:<Home size={17}/>,lb:'Trang chủ'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả'}];
   return (
     <>
@@ -1552,6 +1552,108 @@ const Login = ({onLogin, employees}) => {
 };
 
 // ── MAIN APP ──
+// ── EXAM RESULTS (admin): pick an exam → list every attempt for it ──
+const ExamResults = ({results, exams, employees}) => {
+  const [selId, setSelId] = useState(null);
+  const fmtTime = (t) => t!=null ? `${Math.floor(t/60)}p${String(t%60).padStart(2,'0')}s` : '--';
+
+  // Step 1 — choose an exam
+  if(selId==null){
+    return (
+      <div>
+        <div className="mb-4"><h1 className="text-lg md:text-xl font-bold text-slate-800">Kết quả thi</h1><p className="text-slate-500 text-xs md:text-sm mt-0.5">Chọn một đề thi để xem danh sách người thi và kết quả</p></div>
+        {exams.length===0 ? (
+          <div className="bg-white rounded-xl p-8 text-center text-slate-400 border border-slate-100">Chưa có đề thi nào.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {exams.map(exam=>{
+              const count = results.filter(r=>r.examId===exam.id).length;
+              return (
+                <button key={exam.id} onClick={()=>setSelId(exam.id)} className="text-left bg-white rounded-xl p-5 shadow-sm border border-slate-100 hover:border-red-300 hover:shadow transition-all">
+                  <h3 className="font-semibold text-slate-800 mb-1">{exam.title}</h3>
+                  <p className="text-sm text-slate-500 mb-3 truncate">{exam.desc}</p>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="flex items-center gap-1"><Users size={12}/>{count} lượt thi</span>
+                    <span className="flex items-center gap-1 text-red-600 font-medium">Xem <ChevronRight size={13}/></span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Step 2 — results of the selected exam (all attempts, newest first)
+  const exam = exams.find(e=>e.id===selId);
+  const totalQ = exam?.qIds?.length || 0;
+  const rows = results.filter(r=>r.examId===selId).sort((a,b)=>b.id-a.id);
+
+  const exportExcel = () => {
+    const head = ['Họ và tên','Phòng ban','Điểm (%)','Số câu đúng','Tổng câu','Kết quả','Thời gian làm bài','Ngày thi'];
+    const body = rows.map(r=>{
+      const emp = employees.find(e=>e.id===r.empId);
+      const ok = exam && r.score >= exam.pass;
+      return [emp?.name||'(Đã xóa)', emp?.dept||'', r.score, r.correct, totalQ, ok?'Đạt':'Không đạt', fmtTime(r.timeTaken), r.date];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['KẾT QUẢ THI: '+(exam?.title||'')],
+      ['Xuất ngày: '+new Date().toLocaleDateString('vi-VN')],
+      [],
+      head, ...body,
+    ]);
+    ws['!cols']=[{wch:22},{wch:18},{wch:10},{wch:12},{wch:10},{wch:14},{wch:16},{wch:14}];
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:7}}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Kết quả');
+    const safeTitle = (exam?.title||'de_thi').replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,40);
+    XLSX.writeFile(wb, `KetQua_${safeTitle}_${new Date().toLocaleDateString('vi-VN').replace(/\//g,'-')}.xlsx`);
+  };
+
+  return (
+    <div>
+      <button onClick={()=>setSelId(null)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-red-600 mb-3"><ChevronRight size={15} className="rotate-180"/>Chọn đề thi khác</button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+        <div>
+          <h1 className="text-lg md:text-xl font-bold text-slate-800">{exam?.title||'Đề thi đã xóa'}</h1>
+          <p className="text-slate-500 text-xs md:text-sm mt-0.5">{rows.length} lượt thi • {totalQ} câu • Điểm đạt: {exam?.pass}%</p>
+        </div>
+        {rows.length>0 && (
+          <button onClick={exportExcel} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium self-start"><Download size={15}/>Xuất Excel</button>
+        )}
+      </div>
+
+      {rows.length===0 ? (
+        <div className="bg-white rounded-xl p-8 text-center text-slate-400 border border-slate-100">Chưa có ai thi đề này.</div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
+          <table className="w-full min-w-[640px]">
+            <thead><tr className="bg-slate-50">{['Nhân viên','Phòng ban','Điểm','Số câu đúng','Kết quả','Thời gian','Ngày thi'].map(h=><th key={h} className={`px-3 py-2 text-xs font-medium text-slate-400 uppercase ${h==='Kết quả'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
+            <tbody>
+              {rows.map(r=>{
+                const emp=employees.find(e=>e.id===r.empId);
+                const ok=exam&&r.score>=exam.pass;
+                return (
+                  <tr key={r.id} className="border-t border-slate-50 hover:bg-slate-50/50">
+                    <td className="px-3 py-2 text-xs text-slate-700 font-medium">{emp?.name||<span className="text-slate-400 italic">(Đã xóa)</span>}</td>
+                    <td className="px-3 py-2 text-xs text-slate-600">{emp?.dept||'--'}</td>
+                    <td className="px-3 py-2 text-xs font-bold text-slate-800">{r.score}%</td>
+                    <td className="px-3 py-2 text-xs text-slate-600">{r.correct}/{totalQ}</td>
+                    <td className="px-3 py-2 text-center"><Badge ok={ok}/></td>
+                    <td className="px-3 py-2 text-xs text-slate-500">{fmtTime(r.timeTaken)}</td>
+                    <td className="px-3 py-2 text-xs text-slate-400">{r.date}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('dashboard');
@@ -1634,6 +1736,7 @@ export default function App() {
     dashboard: <Reports results={results} exams={exams} employees={employees}/>,
     questions: <Questions questions={questions} setQuestions={setQuestionsSync}/>,
     exams:     <Exams exams={exams} setExams={setExamsSync} questions={questions}/>,
+    results:   <ExamResults results={results} exams={exams} employees={employees}/>,
     employees: <EmployeesView employees={employees} setEmployees={setEmployeesSync} results={results} exams={exams}/>,
   };
   const empViews = {
