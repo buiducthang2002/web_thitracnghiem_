@@ -1387,7 +1387,7 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
 
 // ── RESULT SCREEN ──
 const ResultScreen = ({result, exam, questions, onBack}) => {
-  const qs = questions.filter(q=>exam.qIds.includes(q.id));
+  const qs = exam.qIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
   const ok = result.score>=exam.pass;
   return (
     <div className="min-h-screen bg-slate-50">
