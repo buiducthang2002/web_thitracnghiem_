@@ -1281,7 +1281,7 @@ const MyResults = ({user, exams, results}) => {
 
 // ── EXAM SCREEN ──
 const ExamScreen = ({user, exam, questions, onFinish}) => {
-  const qs = questions.filter(q=>exam.qIds.includes(q.id));
+  const qs = exam.qIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
   const [cur, setCur] = useState(0);
   const [ans, setAns] = useState(Array(qs.length).fill(-1));
   const [tLeft, setTLeft] = useState(exam.time*60);
