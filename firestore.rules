@@ -1,0 +1,88 @@
+rules_version = '2';
+
+// Quy tắc bảo mật Firestore cho hệ thống thi trắc nghiệm.
+//
+// App hiện chưa dùng Firebase Authentication (đăng nhập bằng danh sách thí sinh
+// lưu trong Firestore), nên rules dưới đây vẫn cho phép đọc/ghi không cần token.
+// Tuy nhiên đã siết lại 2 điểm so với "allow read, write: if true":
+//   1. Chỉ 4 collection của app mới ghi được — mọi đường dẫn khác bị chặn.
+//   2. Dữ liệu ghi vào phải đúng kiểu, tránh ghi rác / sai cấu trúc.
+//
+// Ràng buộc cố ý giữ ở mức "đủ dùng": app không hiển thị lỗi ghi Firestore,
+// nên rule quá chặt sẽ làm mất dữ liệu âm thầm.
+//
+// ⚠️ Đây vẫn là rules mức "mở". Xem ghi chú cuối file để siết chặt hơn.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Thí sinh ──────────────────────────────────────────
+    // { id, name: string, dept: string }
+    match /employees/{id} {
+      allow read, delete: if true;
+      allow create, update: if
+        request.resource.data.keys().hasAll(['id', 'name', 'dept']) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.name.size() <= 200 &&
+        request.resource.data.dept is string;
+    }
+
+    // ── Ngân hàng câu hỏi ─────────────────────────────────
+    // { id, topic: string, level: string, text: string, opts: string[], ans: number, order?: number }
+    match /questions/{id} {
+      allow read, delete: if true;
+      allow create, update: if
+        request.resource.data.keys().hasAll(['id', 'text', 'opts', 'ans']) &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.opts is list &&
+        request.resource.data.opts.size() >= 2 &&
+        request.resource.data.opts.size() <= 10 &&
+        request.resource.data.ans is number;
+    }
+
+    // ── Đề thi ────────────────────────────────────────────
+    // { id, title: string, topic: string, qIds: number[], time: number, pass: number, desc: string }
+    match /exams/{id} {
+      allow read, delete: if true;
+      allow create, update: if
+        request.resource.data.keys().hasAll(['id', 'title', 'qIds', 'time', 'pass']) &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() > 0 &&
+        request.resource.data.qIds is list &&
+        request.resource.data.time is number &&
+        request.resource.data.pass is number;
+    }
+
+    // ── Kết quả bài thi ───────────────────────────────────
+    // { id, empId, examId, score, correct, timeTaken, date: string, answers: number[] }
+    match /results/{id} {
+      allow read, delete: if true;
+      allow create, update: if
+        request.resource.data.keys().hasAll(['id', 'empId', 'examId', 'score', 'correct', 'date']) &&
+        request.resource.data.score is number &&
+        request.resource.data.correct is number &&
+        request.resource.data.date is string;
+    }
+
+    // ── Chặn mọi đường dẫn khác ───────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// SIẾT CHẶT HƠN (khi đã tích hợp Firebase Authentication):
+//
+//   match /results/{id} {
+//     allow read:   if request.auth != null;
+//     allow create: if request.auth != null;
+//     allow update, delete: if request.auth.token.admin == true;
+//   }
+//
+// Và với employees / questions / exams:
+//   allow read:  if request.auth != null;
+//   allow write: if request.auth.token.admin == true;
+// ─────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-# 🏥 Bệnh viện Quân y 4 — Hệ thống thi trắc nghiệm
+# 🏥 Cục hậu cần kỹ thuật quân khu 4 — Hệ thống thi trắc nghiệm
 
 Hướng dẫn cài đặt và deploy để mọi người cùng sử dụng.
 
@@ -124,22 +124,49 @@ Vào các mục để thêm:
 
 ---
 
+## 🗄️ Cấu trúc dữ liệu trên Firestore
+
+App dùng **4 collection**, mỗi document có `id` trùng với tên document (dạng chuỗi):
+
+| Collection | Mô tả | Các trường |
+|---|---|---|
+| `employees` | Thí sinh | `id`, `name`, `dept` |
+| `questions` | Ngân hàng câu hỏi | `id`, `topic`, `level` (`Dễ`/`TB`/`Khó`), `text`, `opts[]`, `ans` (index đáp án đúng, tính từ 0) |
+| `exams` | Đề thi | `id`, `title`, `topic`, `qIds[]`, `time` (phút), `pass` (% điểm đạt), `desc` |
+| `results` | Kết quả bài làm | `id`, `empId`, `examId`, `score` (%), `correct`, `timeTaken` (giây), `date`, `answers[]` |
+
+Không cần tạo collection thủ công — app tự tạo khi ghi document đầu tiên.
+
+### Nạp dữ liệu mẫu (tuỳ chọn)
+
+Sau khi đã điền `.env`, chạy:
+
+```bash
+npm run seed
+```
+
+> ⚠️ Lệnh này **xoá sạch** dữ liệu cũ trong cả 4 collection rồi ghi lại dữ liệu mẫu trong `seed.mjs`. Chỉ chạy khi mới cài đặt.
+
+---
+
 ## 🔒 Bảo mật Firestore (quan trọng!)
 
-Sau khi test xong, vào **Firestore → Rules** và thay bằng:
+Rules đã được viết sẵn trong file **`firestore.rules`**. Có 2 cách áp dụng:
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;  // Tạm thời - cần thêm auth sau
-    }
-  }
-}
+**Cách 1 — Dán thủ công (đơn giản nhất)**
+1. Mở file `firestore.rules` trong project
+2. Copy toàn bộ nội dung
+3. Vào **Firebase Console → Firestore Database → Rules** → dán đè lên → **Publish**
+
+**Cách 2 — Deploy bằng Firebase CLI**
+```bash
+npm install -g firebase-tools
+firebase login
+firebase use --add          # chọn project vừa tạo
+firebase deploy --only firestore:rules
 ```
 
-> ⚠️ **Lưu ý:** Rule trên cho phép mọi người đọc/ghi. Nếu cần bảo mật cao hơn, hãy tích hợp Firebase Authentication.
+> ⚠️ **Lưu ý:** Rules hiện tại cho phép đọc/ghi không cần đăng nhập (vì app chưa dùng Firebase Authentication), nhưng đã chặn mọi collection lạ và kiểm tra kiểu dữ liệu. Nếu cần bảo mật cao hơn, xem phần ghi chú ở cuối file `firestore.rules`.
 
 ---
 
@@ -160,6 +187,10 @@ quizpro/
 │   └── index.css        # Styles
 ├── .env.example         # Mẫu biến môi trường
 ├── .env                 # ⚠️ KHÔNG commit file này lên GitHub
+├── firebase.json        # Cấu hình Firebase CLI
+├── firestore.rules      # Quy tắc bảo mật Firestore
+├── firestore.indexes.json
+├── seed.mjs             # Script nạp dữ liệu mẫu (npm run seed)
 ├── index.html
 ├── package.json
 ├── vite.config.js

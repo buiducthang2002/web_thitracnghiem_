@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, XCircle, Award, Home, Play, TrendingUp, X, ChevronRight, Shield, Upload, Download, AlertCircle } from "lucide-react";
+import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, XCircle, Award, Home, Play, TrendingUp, X, ChevronRight, Shield, ShieldCheck, Star, ArrowRight, ArrowLeft, Upload, Download, AlertCircle } from "lucide-react";
 import { db } from "./firebase";
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
@@ -13,7 +13,7 @@ const QUESTIONS_INIT = [];
 const EXAMS_INIT = [];
 const RESULTS_INIT = [];
 
-const AV_COLORS = ["bg-red-600","bg-red-500","bg-violet-500","bg-rose-500","bg-rose-500"];
+const AV_COLORS = ["bg-emerald-600","bg-teal-600","bg-violet-500","bg-amber-600","bg-rose-500"];
 const getAv = n => n.split(' ').map(w=>w[0]).join('').slice(-2).toUpperCase();
 const Avatar = ({name, sz="md"}) => {
   const s = {sm:"w-7 h-7 text-xs",md:"w-9 h-9 text-sm",lg:"w-12 h-12 text-base"}[sz];
@@ -37,19 +37,19 @@ const Sidebar = ({role, active, setActive, user, onLogout}) => {
   return (
     <>
       {/* Desktop sidebar */}
-      <div className="hidden md:flex w-56 bg-red-950 h-screen flex-col fixed left-0 top-0 z-10">
-        <div className="p-4 border-b border-red-800/50 flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={15} className="text-white"/></div>
-          <div><div className="text-white font-bold text-sm leading-tight">Cục hậu cần - kỹ thuật Quân khu 4</div><div className="text-slate-400 text-xs">Hệ thống thi trắc nghiệm</div></div>
+      <div className="hidden md:flex w-64 bg-green-950 h-screen flex-col fixed left-0 top-0 z-10">
+        <div className="p-4 border-b border-green-800/50 flex flex-col items-center gap-2 text-center">
+          <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={15} className="text-white"/></div>
+          <div><div className="text-white font-bold text-[11px] leading-tight whitespace-nowrap">Cục hậu cần - kỹ thuật Quân khu 4</div><div className="text-slate-400 text-[10px] whitespace-nowrap">Hệ thống thi trắc nghiệm</div></div>
         </div>
         <nav className="flex-1 p-2.5 space-y-0.5">
           {nav.map(i=>(
-            <button key={i.id} onClick={()=>setActive(i.id)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-all ${active===i.id?'bg-red-600 text-white':'text-slate-400 hover:text-white hover:bg-red-900'}`}>
+            <button key={i.id} onClick={()=>setActive(i.id)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-all ${active===i.id?'bg-emerald-600 text-white':'text-slate-400 hover:text-white hover:bg-green-900'}`}>
               {i.ic}<span>{i.lb}</span>
             </button>
           ))}
         </nav>
-        <div className="p-2.5 border-t border-red-800/50">
+        <div className="p-2.5 border-t border-green-800/50">
           <div className="flex items-center gap-2 px-2 py-1.5">
             <Avatar name={user.name} sz="sm"/>
             <div className="flex-1 min-w-0">
@@ -62,24 +62,24 @@ const Sidebar = ({role, active, setActive, user, onLogout}) => {
       </div>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-20 bg-red-950 flex items-center justify-between px-4 py-2.5 border-b border-red-800/50">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={13} className="text-white"/></div>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-20 bg-green-950 flex items-center justify-between px-4 py-2.5 border-b border-green-800/50">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="w-7 h-7 bg-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={13} className="text-white"/></div>
           <div>
-            <div className="text-white font-bold text-xs leading-tight">Cục hậu cần - kỹ thuật Quân khu 4</div>
-            <div className="text-slate-400 text-[10px]">Hệ thống thi trắc nghiệm</div>
+            <div className="text-white font-bold text-[10px] leading-tight whitespace-nowrap">Cục hậu cần - kỹ thuật Quân khu 4</div>
+            <div className="text-slate-400 text-[9px] whitespace-nowrap">Hệ thống thi trắc nghiệm</div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-white text-xs">{user.name.split(' ').pop()}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-white text-xs truncate">{user.name.split(' ').pop()}</span>
           <button onClick={onLogout} className="text-slate-400 hover:text-red-300 p-1"><LogOut size={15}/></button>
         </div>
       </div>
 
       {/* Mobile bottom nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-red-950 border-t border-red-800/50 flex">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-green-950 border-t border-green-800/50 flex">
         {nav.map(i=>(
-          <button key={i.id} onClick={()=>setActive(i.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-all ${active===i.id?'text-red-400':'text-slate-500'}`}>
+          <button key={i.id} onClick={()=>setActive(i.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-all ${active===i.id?'text-emerald-400':'text-slate-500'}`}>
             {i.ic}
             <span className="text-[10px]">{i.lb}</span>
           </button>
@@ -98,10 +98,10 @@ const Dashboard = ({results, exams, questions, employees}) => {
   const pie = [{name:'Đạt',value:passed,c:'#22c55e'},{name:'Chưa đạt',value:total-passed,c:'#f87171'}];
   const recent = [...results].sort((a,b)=>b.id-a.id).slice(0,6);
   const stats = [
-    {ic:<FileText size={18}/>,val:total,lb:'Lượt thi',col:'bg-red-50 text-red-700'},
-    {ic:<CheckCircle size={18}/>,val:`${total?Math.round(passed/total*100):0}%`,lb:'Tỉ lệ đạt',col:'bg-emerald-100 text-red-600'},
-    {ic:<TrendingUp size={18}/>,val:`${avg}%`,lb:'Điểm trung bình',col:'bg-red-100 text-red-600'},
-    {ic:<BookOpen size={18}/>,val:questions.length,lb:'Câu hỏi',col:'bg-rose-100 text-rose-700'},
+    {ic:<FileText size={18}/>,val:total,lb:'Lượt thi',col:'bg-emerald-50 text-emerald-700'},
+    {ic:<CheckCircle size={18}/>,val:`${total?Math.round(passed/total*100):0}%`,lb:'Tỉ lệ đạt',col:'bg-teal-100 text-teal-700'},
+    {ic:<TrendingUp size={18}/>,val:`${avg}%`,lb:'Điểm trung bình',col:'bg-amber-100 text-amber-700'},
+    {ic:<BookOpen size={18}/>,val:questions.length,lb:'Câu hỏi',col:'bg-violet-100 text-violet-700'},
   ];
   return (
     <div>
@@ -125,7 +125,7 @@ const Dashboard = ({results, exams, questions, employees}) => {
               <XAxis dataKey="name" tick={{fontSize:10}} interval={0}/>
               <YAxis domain={[0,100]} tick={{fontSize:10}}/>
               <Tooltip cursor={false} formatter={v=>[`${v}%`,'Điểm TB']}/>
-              <Bar dataKey="avg" fill="#dc2626" radius={[4,4,0,0]} cursor={false}/>
+              <Bar dataKey="avg" fill="#15803d" radius={[4,4,0,0]} cursor={false}/>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -145,7 +145,7 @@ const Dashboard = ({results, exams, questions, employees}) => {
                 {lb:'Tổng lượt thi', val:total, cl:'text-slate-700'},
                 {lb:'Số bài đạt', val:passed, cl:'text-emerald-600'},
                 {lb:'Số bài trượt', val:total-passed, cl:'text-red-500'},
-                {lb:'Tỉ lệ đạt', val:`${total?Math.round(passed/total*100):0}%`, cl:'text-red-600 font-bold'},
+                {lb:'Tỉ lệ đạt', val:`${total?Math.round(passed/total*100):0}%`, cl:'text-emerald-600 font-bold'},
               ].map(s=>(
                 <div key={s.lb} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-1.5">
                   <span className="text-xs text-slate-500">{s.lb}</span>
@@ -347,7 +347,7 @@ LƯU Ý:
             <div className="flex items-center justify-between p-5 border-b">
               <div>
                 <h2 className="font-bold text-slate-800">Xem trước câu hỏi import</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Tìm thấy <span className="font-semibold text-red-600">{previewList.length} câu hỏi</span> — kiểm tra trước khi thêm vào ngân hàng</p>
+                <p className="text-xs text-slate-500 mt-0.5">Tìm thấy <span className="font-semibold text-emerald-600">{previewList.length} câu hỏi</span> — kiểm tra trước khi thêm vào ngân hàng</p>
               </div>
               <button onClick={()=>setPreviewList(null)} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
             </div>
@@ -360,7 +360,7 @@ LƯU Ý:
                   <p className="text-sm font-medium text-slate-700 mb-2">{q.text}</p>
                   <div className="grid grid-cols-2 gap-1">
                     {q.opts.map((o,j)=>(
-                      <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg ${j===q.ans?'bg-red-50 text-red-700 font-medium border border-red-200':'bg-white text-slate-500 border border-slate-100'}`}>
+                      <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg ${j===q.ans?'bg-emerald-50 text-emerald-700 font-medium border border-emerald-200':'bg-white text-slate-500 border border-slate-100'}`}>
                         {String.fromCharCode(65+j)}. {o}
                       </div>
                     ))}
@@ -370,7 +370,7 @@ LƯU Ý:
             </div>
             <div className="p-4 border-t flex gap-2">
               <button onClick={()=>setPreviewList(null)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
-              <button onClick={confirmImport} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600">
+              <button onClick={confirmImport} className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600">
                 Thêm {previewList.length} câu hỏi vào ngân hàng
               </button>
             </div>
@@ -388,13 +388,13 @@ LƯU Ý:
             <Upload size={14}/>{importing?'Đang đọc...':'Import Word'}
           </button>
           <input ref={wordRef} type="file" accept=".docx" className="hidden" onChange={handleWordImport}/>
-          <button onClick={()=>setModal(true)} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium"><Plus size={15}/>Thêm câu hỏi</button>
+          <button onClick={()=>setModal(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium"><Plus size={15}/>Thêm câu hỏi</button>
         </div>
       </div>
 
       {importResult && (
-        <div className={`mb-4 rounded-xl p-4 flex items-start gap-3 ${importResult.error?'bg-red-50 border border-red-200':'bg-red-50 border border-red-200'}`}>
-          {importResult.error ? <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5"/> : <CheckCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5"/>}
+        <div className={`mb-4 rounded-xl p-4 flex items-start gap-3 ${importResult.error?'bg-red-50 border border-red-200':'bg-emerald-50 border border-emerald-200'}`}>
+          {importResult.error ? <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5"/> : <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5"/>}
           <p className={`text-sm flex-1 ${importResult.error?'text-red-700':'text-emerald-800 font-medium'}`}>
             {importResult.error || `Đã thêm thành công ${importResult.added} câu hỏi vào ngân hàng!`}
           </p>
@@ -418,7 +418,7 @@ LƯU Ý:
                   {nq.topic==='__custom__' && (
                     <input
                       autoFocus
-                      className="mt-2 w-full border border-red-300 bg-red-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
+                      className="mt-2 w-full border border-emerald-300 bg-emerald-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
                       placeholder="Nhập tên chủ đề mới"
                       value={customTopic}
                       onChange={e=>setCustomTopic(e.target.value)}
@@ -432,7 +432,7 @@ LƯU Ý:
                 <div className="space-y-2">
                   {['A','B','C','D'].map((lt,i)=>(
                     <div key={i} className="flex items-center gap-2">
-                      <button onClick={()=>setNq({...nq,ans:i})} className={`w-7 h-7 rounded-full flex-shrink-0 border-2 flex items-center justify-center text-xs font-bold transition-all ${nq.ans===i?'border-red-600 bg-red-600 text-white':'border-slate-300 text-slate-400 hover:border-red-500'}`}>{lt}</button>
+                      <button onClick={()=>setNq({...nq,ans:i})} className={`w-7 h-7 rounded-full flex-shrink-0 border-2 flex items-center justify-center text-xs font-bold transition-all ${nq.ans===i?'border-emerald-600 bg-emerald-600 text-white':'border-slate-300 text-slate-400 hover:border-emerald-500'}`}>{lt}</button>
                       <input className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm" value={nq.opts[i]} onChange={e=>{const o=[...nq.opts];o[i]=e.target.value;setNq({...nq,opts:o});}} placeholder={`Đáp án ${lt}`}/>
                     </div>
                   ))}
@@ -440,7 +440,7 @@ LƯU Ý:
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={()=>{setModal(false);setCustomTopic('');setNq({topic:'Nội quy',level:'Dễ',text:'',opts:['','','',''],ans:0});}} className="flex-1 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
-                <button onClick={add} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">Thêm câu hỏi</button>
+                <button onClick={add} className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">Thêm câu hỏi</button>
               </div>
             </div>
           </div>
@@ -457,7 +457,7 @@ LƯU Ý:
                 <p className="text-sm font-medium text-slate-700 mb-2">{q.text}</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {q.opts.map((o,i)=>(
-                    <div key={i} className={`text-xs px-2.5 py-1.5 rounded-lg ${i===q.ans?'bg-red-50 text-red-700 font-medium border border-red-200':'bg-slate-50 text-slate-500'}`}>
+                    <div key={i} className={`text-xs px-2.5 py-1.5 rounded-lg ${i===q.ans?'bg-emerald-50 text-emerald-700 font-medium border border-emerald-200':'bg-slate-50 text-slate-500'}`}>
                       {String.fromCharCode(65+i)}. {o}
                     </div>
                   ))}
@@ -486,7 +486,7 @@ const Exams = ({exams, setExams, questions}) => {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Quản lý đề thi</h1><p className="text-slate-500 text-sm">{exams.length} đề thi</p></div>
-        <button onClick={()=>setModal(true)} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium"><Plus size={15}/>Tạo đề thi</button>
+        <button onClick={()=>setModal(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium"><Plus size={15}/>Tạo đề thi</button>
       </div>
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -518,7 +518,7 @@ const Exams = ({exams, setExams, questions}) => {
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={()=>setModal(false)} className="flex-1 py-2 border border-slate-200 rounded-lg text-sm text-slate-600">Hủy</button>
-                <button onClick={create} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm">Tạo đề thi</button>
+                <button onClick={create} className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm">Tạo đề thi</button>
               </div>
             </div>
           </div>
@@ -702,7 +702,7 @@ const downloadTemplate = () => {
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">Họ và tên <span className="text-red-400">*</span></label>
                 <input
                   autoFocus
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-500"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-emerald-500"
                   placeholder="VD: Nguyễn Văn A"
                   value={form.name}
                   onChange={e=>{ setForm(f=>({...f,name:e.target.value})); setFormErr(''); }}
@@ -711,7 +711,7 @@ const downloadTemplate = () => {
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-400">*</span></label>
                 <select
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-500 mb-2"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-emerald-500 mb-2"
                   value={form.dept}
                   onChange={e=>{ setForm(f=>({...f,dept:e.target.value})); setFormErr(''); }}
                 >
@@ -720,7 +720,7 @@ const downloadTemplate = () => {
                 </select>
                 {form.dept==='__custom__' && (
                   <input
-                    className="w-full border border-red-300 bg-red-50 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-500"
+                    className="w-full border border-emerald-300 bg-emerald-50 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-emerald-500"
                     placeholder="Nhập tên đơn vị mới"
                     value={customDept}
                     onChange={e=>{ setCustomDept(e.target.value); setFormErr(''); }}
@@ -735,7 +735,7 @@ const downloadTemplate = () => {
               )}
               <div className="flex gap-2 pt-1">
                 <button onClick={closeModal} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
-                <button onClick={handleSave} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700">
+                <button onClick={handleSave} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700">
                   {modal.mode==='add'?'Thêm thí sinh':'Lưu thay đổi'}
                 </button>
               </div>
@@ -755,7 +755,7 @@ const downloadTemplate = () => {
             <p className="text-sm text-slate-500 text-center mb-1">
               Bạn có chắc muốn xóa <span className="font-semibold text-slate-700">{modal.emp.name}</span>?
             </p>
-            <p className="text-xs text-red-400 text-center mb-5">Lịch sử thi của thí sinh này sẽ vẫn được giữ lại.</p>
+            <p className="text-xs text-slate-400 text-center mb-5">Lịch sử thi của thí sinh này sẽ vẫn được giữ lại.</p>
             <div className="flex gap-2">
               <button onClick={closeModal} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
               <button onClick={handleDelete} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600">Xóa thí sinh</button>
@@ -766,14 +766,14 @@ const downloadTemplate = () => {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center"><Users size={22} className="text-red-600"/></div>
+          <div className="w-11 h-11 bg-emerald-100 rounded-xl flex items-center justify-center"><Users size={22} className="text-emerald-600"/></div>
           <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Thí sinh</h1><p className="text-slate-500 text-xs">{employees.length} thí sinh</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50"><Download size={14}/>Tải file mẫu</button>
           <button onClick={()=>fileRef.current.click()} disabled={importing} className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-60"><Upload size={14}/>{importing?'Đang import...':'Import Excel'}</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport}/>
-          <button onClick={openAdd} className="flex items-center gap-1.5 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium"><Plus size={15}/>Thêm thí sinh</button>
+          <button onClick={openAdd} className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium"><Plus size={15}/>Thêm thí sinh</button>
         </div>
       </div>
 
@@ -790,7 +790,7 @@ const downloadTemplate = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          {ic:<Users size={18}/>, val:employees.length, lb:'Tổng thí sinh', col:'bg-red-100 text-red-600'},
+          {ic:<Users size={18}/>, val:employees.length, lb:'Tổng thí sinh', col:'bg-emerald-100 text-emerald-600'},
           {ic:<CheckCircle size={18}/>, val:<span>{totalPassed} <span className="text-xs font-normal text-slate-400">{passRate}%</span></span>, lb:'Đạt', col:'bg-emerald-100 text-emerald-600'},
           {ic:<TrendingUp size={18}/>, val:`${globalAvg}%`, lb:'Điểm TB chung', col:'bg-amber-100 text-amber-600'},
           {ic:<FileText size={18}/>, val:avgAttempts, lb:'Lượt thi TB', col:'bg-violet-100 text-violet-600'},
@@ -807,7 +807,7 @@ const downloadTemplate = () => {
         <div className="flex gap-2 flex-wrap">
           {deptCounts.map(({dept,count})=>(
             <button key={dept} onClick={()=>{setActiveDept(dept);setPage(1);}}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${activeDept===dept?'bg-red-600 text-white border-red-600':'bg-white text-slate-600 border-slate-200 hover:border-red-300'}`}>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${activeDept===dept?'bg-emerald-600 text-white border-emerald-600':'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'}`}>
               {dept}<span className={`text-xs px-1.5 py-0.5 rounded-full ml-0.5 ${activeDept===dept?'bg-white/25 text-white':'bg-slate-100 text-slate-500'}`}>{count}</span>
             </button>
           ))}
@@ -837,17 +837,17 @@ const downloadTemplate = () => {
                   <td colSpan={6} className="px-5 py-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-red-100 rounded-lg flex items-center justify-center"><Users size={11} className="text-red-500"/></div>
+                        <div className="w-6 h-6 bg-emerald-100 rounded-lg flex items-center justify-center"><Users size={11} className="text-emerald-500"/></div>
                         {renamingDept===dept ? (
                           <div className="flex items-center gap-2">
-                            <input autoFocus className="border border-red-400 bg-red-50 rounded px-2 py-0.5 text-sm font-semibold focus:outline-none w-36" value={renameVal} onChange={e=>setRenameVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')commitRename();if(e.key==='Escape')setRenamingDept(null);}}/>
-                            <button onClick={commitRename} className="px-2 py-0.5 bg-red-600 text-white rounded text-xs">Lưu</button>
+                            <input autoFocus className="border border-emerald-400 bg-emerald-50 rounded px-2 py-0.5 text-sm font-semibold focus:outline-none w-36" value={renameVal} onChange={e=>setRenameVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')commitRename();if(e.key==='Escape')setRenamingDept(null);}}/>
+                            <button onClick={commitRename} className="px-2 py-0.5 bg-emerald-600 text-white rounded text-xs">Lưu</button>
                             <button onClick={()=>setRenamingDept(null)} className="px-2 py-0.5 border border-slate-200 rounded text-xs text-slate-500">Hủy</button>
                           </div>
                         ) : (
                           <>
                             <span className="text-sm font-semibold text-slate-700">{dept}</span>
-                            <button onClick={()=>startRename(dept)} className="text-xs text-slate-400 hover:text-red-600 ml-1 px-1.5 py-0.5 rounded hover:bg-red-50">✎ Đổi tên</button>
+                            <button onClick={()=>startRename(dept)} className="text-xs text-slate-400 hover:text-emerald-600 ml-1 px-1.5 py-0.5 rounded hover:bg-emerald-50">✎ Đổi tên</button>
                           </>
                         )}
                       </div>
@@ -866,7 +866,7 @@ const downloadTemplate = () => {
                     <tr key={emp.id} className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors">
                       <td className="px-5 py-3 text-sm font-medium text-slate-800">{emp.name}</td>
                       <td className="px-5 py-3 text-sm text-slate-600">{rs.length}</td>
-                      <td className="px-5 py-3 text-sm font-semibold text-red-600">{passed}</td>
+                      <td className="px-5 py-3 text-sm font-semibold text-emerald-600">{passed}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-slate-800 w-10">{avg?`${avg}%`:'--'}</span>
@@ -883,7 +883,7 @@ const downloadTemplate = () => {
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-center gap-1.5">
-                          <button onClick={()=>openEdit(emp)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-300 hover:text-red-600 transition-all"><FileText size={13}/></button>
+                          <button onClick={()=>openEdit(emp)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 transition-all"><FileText size={13}/></button>
                           <button onClick={()=>openDelete(emp)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-300 hover:text-red-600 transition-all"><Trash2 size={13}/></button>
                         </div>
                       </td>
@@ -905,11 +905,11 @@ const downloadTemplate = () => {
         {totalPages>1 && (
           <div className="flex items-center justify-center gap-2 py-4 border-t border-slate-100">
             <span className="text-xs text-slate-500 mr-2">Hiển thị {filtered.length} thí sinh</span>
-            <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-300 disabled:opacity-40">‹</button>
+            <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-emerald-300 disabled:opacity-40">‹</button>
             {Array.from({length:totalPages},(_,i)=>i+1).map(p=>(
-              <button key={p} onClick={()=>setPage(p)} className={`w-7 h-7 rounded-lg text-xs font-medium ${p===page?'bg-red-600 text-white':'border border-slate-200 text-slate-500 hover:border-red-300'}`}>{p}</button>
+              <button key={p} onClick={()=>setPage(p)} className={`w-7 h-7 rounded-lg text-xs font-medium ${p===page?'bg-emerald-600 text-white':'border border-slate-200 text-slate-500 hover:border-emerald-300'}`}>{p}</button>
             ))}
-            <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-300 disabled:opacity-40">›</button>
+            <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-emerald-300 disabled:opacity-40">›</button>
           </div>
         )}
       </div>
@@ -943,7 +943,7 @@ const Reports = ({results, exams, employees}) => {
     {name:`Chưa đạt (< 50%)`, value:chuaDat, c:'#ef4444'},
   ];
 
-  const barColors = ['#ef4444','#f59e0b','#22c55e','#3b82f6','#8b5cf6','#ec4899'];
+  const barColors = ['#15803d','#0d9488','#f59e0b','#3b82f6','#8b5cf6','#ec4899'];
   const barData = deptData.map((d,i)=>({...d, fill:barColors[i%barColors.length]}));
 
   const trends = ['+15%','-10%','+8%','+20%'];
@@ -1003,10 +1003,10 @@ const Reports = ({results, exams, employees}) => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center"><TrendingUp size={20} className="text-red-600"/></div>
+          <div className="w-11 h-11 bg-emerald-100 rounded-xl flex items-center justify-center"><TrendingUp size={20} className="text-emerald-600"/></div>
           <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Báo cáo & Phân tích</h1><p className="text-slate-500 text-xs">Phân tích kết quả thi theo đơn vị</p></div>
         </div>
-        <button onClick={exportExcel} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium">
+        <button onClick={exportExcel} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium">
           <Download size={15}/>Xuất Excel <ChevronRight size={14} className="rotate-90"/>
         </button>
       </div>
@@ -1014,7 +1014,7 @@ const Reports = ({results, exams, employees}) => {
       {/* Stat cards with sparklines */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          {ic:<BarChart2 size={18}/>, val:depts.length, lb:'Đơn vị', sub:'Đã có dữ liệu', icCol:'bg-red-100 text-red-600', spark:'#fca5a5', path:'M0,20 C10,15 20,25 30,18 C40,10 50,22 60,16 C70,10 80,20 90,14'},
+          {ic:<BarChart2 size={18}/>, val:depts.length, lb:'Đơn vị', sub:'Đã có dữ liệu', icCol:'bg-teal-100 text-teal-600', spark:'#5eead4', path:'M0,20 C10,15 20,25 30,18 C40,10 50,22 60,16 C70,10 80,20 90,14'},
           {ic:<CheckCircle size={18}/>, val:totalAttempts, lb:'Tổng lượt thi', sub:'Trong kỳ', icCol:'bg-emerald-100 text-emerald-600', spark:'#6ee7b7', path:'M0,22 C15,18 25,24 40,16 C55,8 65,20 80,14 C85,12 88,16 90,13'},
           {ic:<TrendingUp size={18}/>, val:`${globalAvg}%`, lb:'Điểm TB chung', sub:'Toàn hệ thống', icCol:'bg-amber-100 text-amber-600', spark:'#fcd34d', path:'M0,24 C10,20 20,22 35,14 C50,6 60,18 75,12 C82,9 87,15 90,10'},
           {ic:<Award size={18}/>, val:`${bestDept.avg}%`, lb:'Đơn vị cao nhất', sub:bestDept.name, icCol:'bg-violet-100 text-violet-600', spark:'#c4b5fd', path:'M0,20 C12,16 22,22 38,12 C54,2 62,18 78,10 C84,7 88,13 90,8'},
@@ -1125,7 +1125,7 @@ const Reports = ({results, exams, employees}) => {
               const isUp = i%2===0;
               const trendVal = trends[i]||'+0%';
               const trendUp = trendVal.startsWith('+');
-              const barCol = d.rate>=80?'bg-red-500':d.rate>=60?'bg-amber-400':'bg-red-300';
+              const barCol = d.rate>=80?'bg-emerald-500':d.rate>=60?'bg-amber-400':'bg-red-400';
               return (
                 <tr key={d.name} className="border-t border-slate-50 hover:bg-slate-50/40 transition-colors">
                   <td className="px-5 py-4">
@@ -1179,12 +1179,12 @@ const Reports = ({results, exams, employees}) => {
         {/* Decorative illustration */}
         <div className="flex-shrink-0 opacity-20 select-none" aria-hidden>
           <svg width="100" height="70" viewBox="0 0 100 70">
-            <rect x="5" y="40" width="12" height="25" rx="3" fill="#3b82f6"/>
-            <rect x="22" y="28" width="12" height="37" rx="3" fill="#60a5fa"/>
-            <rect x="39" y="18" width="12" height="47" rx="3" fill="#3b82f6"/>
-            <rect x="56" y="30" width="12" height="35" rx="3" fill="#60a5fa"/>
-            <circle cx="80" cy="28" r="18" fill="none" stroke="#3b82f6" strokeWidth="3"/>
-            <path d="M72 28 L78 34 L88 22" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            <rect x="5" y="40" width="12" height="25" rx="3" fill="#15803d"/>
+            <rect x="22" y="28" width="12" height="37" rx="3" fill="#4ade80"/>
+            <rect x="39" y="18" width="12" height="47" rx="3" fill="#15803d"/>
+            <rect x="56" y="30" width="12" height="35" rx="3" fill="#4ade80"/>
+            <circle cx="80" cy="28" r="18" fill="none" stroke="#15803d" strokeWidth="3"/>
+            <path d="M72 28 L78 34 L88 22" stroke="#15803d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
           </svg>
         </div>
       </div>
@@ -1205,7 +1205,7 @@ const EmpHome = ({user, exams, results, onStart}) => {
         <p className="text-slate-500 text-xs md:text-sm">{user.dept} • {new Date().toLocaleDateString('vi-VN')}</p>
       </div>
       <div className="grid grid-cols-3 gap-2 md:gap-3 mb-5">
-        {[{v:my.length,lb:'Lần đã thi',cl:'text-red-700'},{v:passed,lb:'Bài đạt',cl:'text-red-600'},{v:`${avg}%`,lb:'Điểm TB',cl:'text-red-600'}].map(s=>(
+        {[{v:my.length,lb:'Lần đã thi',cl:'text-emerald-700'},{v:passed,lb:'Bài đạt',cl:'text-emerald-600'},{v:`${avg}%`,lb:'Điểm TB',cl:'text-emerald-600'}].map(s=>(
           <div key={s.lb} className="bg-white rounded-xl p-3 md:p-4 shadow-sm border border-slate-100 text-center">
             <div className={`text-xl md:text-2xl font-bold ${s.cl}`}>{s.v}</div>
             <div className="text-xs text-slate-500 mt-0.5">{s.lb}</div>
@@ -1220,7 +1220,7 @@ const EmpHome = ({user, exams, results, onStart}) => {
           return (
             <div key={exam.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0"><FileText size={18} className="text-red-700"/></div>
+                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0"><FileText size={18} className="text-emerald-700"/></div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h3 className="font-semibold text-slate-800 text-sm">{exam.title}</h3>
@@ -1232,10 +1232,10 @@ const EmpHome = ({user, exams, results, onStart}) => {
                     <span className="flex items-center gap-1"><FileText size={10}/>{exam.qIds.length} câu</span>
                     <span className="flex items-center gap-1"><Clock size={10}/>{exam.time} phút</span>
                     <span className="flex items-center gap-1"><Award size={10}/>Đạt: {exam.pass}%</span>
-                    {last&&<span className="text-red-500">Điểm: {last.score}%</span>}
+                    {last&&<span className="text-slate-500">Điểm: {last.score}%</span>}
                   </div>
                 </div>
-                <button onClick={()=>onStart(exam)} className="flex items-center gap-1 bg-red-600 text-white px-3 py-2 rounded-lg text-xs hover:bg-red-700 flex-shrink-0">
+                <button onClick={()=>onStart(exam)} className="flex items-center gap-1 bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs hover:bg-emerald-700 flex-shrink-0">
                   <Play size={11}/>{last?'Thi lại':'Bắt đầu'}
                 </button>
               </div>
@@ -1260,7 +1260,7 @@ const MyResults = ({user, exams, results}) => {
           {my.map(r=>{const exam=exams.find(e=>e.id===r.examId);const ok=exam&&r.score>=exam.pass;return(
             <div key={r.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
               <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${ok?'bg-emerald-100':'bg-red-100'}`}>
-                <span className={`text-lg font-bold ${ok?'text-red-600':'text-red-600'}`}>{r.score}%</span>
+                <span className={`text-lg font-bold ${ok?'text-emerald-600':'text-red-600'}`}>{r.score}%</span>
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-slate-800 text-sm">{exam?.title}</h3>
@@ -1314,16 +1314,16 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
   const q = qs[cur];
 
   return (
-    <div className="min-h-screen bg-red-950 flex flex-col">
-      <div className="bg-red-950 px-6 py-4 flex items-center justify-between border-b border-red-900">
+    <div className="min-h-screen bg-green-950 flex flex-col">
+      <div className="bg-green-950 px-6 py-4 flex items-center justify-between border-b border-green-900">
         <div><div className="text-white font-semibold">{exam.title}</div><div className="text-slate-400 text-sm">{user.name}</div></div>
-        <div className={`flex items-center gap-2 text-lg font-mono font-bold px-4 py-2 rounded-lg ${low?'bg-red-500 text-white':'bg-red-900 text-white'}`}>
+        <div className={`flex items-center gap-2 text-lg font-mono font-bold px-4 py-2 rounded-lg ${low?'bg-red-500 text-white animate-pulse':'bg-green-900 text-white'}`}>
           <Clock size={16}/>{String(mins).padStart(2,'0')}:{String(secs).padStart(2,'0')}
         </div>
       </div>
-      <div className="px-6 py-2 bg-red-950/50">
+      <div className="px-6 py-2 bg-green-950/50">
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-1.5 bg-red-900 rounded-full overflow-hidden"><div className="h-full bg-red-600 rounded-full transition-all" style={{width:`${(cur+1)/qs.length*100}%`}}/></div>
+          <div className="flex-1 h-1.5 bg-green-900 rounded-full overflow-hidden"><div className="h-full bg-emerald-600 rounded-full transition-all" style={{width:`${(cur+1)/qs.length*100}%`}}/></div>
           <span className="text-slate-400 text-xs">{cur+1}/{qs.length}</span>
         </div>
       </div>
@@ -1331,14 +1331,14 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
         <div className="flex-1">
           <div className="bg-white rounded-2xl p-4 md:p-6 mb-4">
             <div className="flex items-center gap-2 mb-4">
-              <span className="px-2.5 py-1 bg-red-50 text-red-700 rounded-lg text-xs font-medium">Câu {cur+1}</span>
+              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium">Câu {cur+1}</span>
             </div>
             <p className="text-slate-800 font-medium text-base leading-relaxed mb-6">{q.text}</p>
             <div className="space-y-3">
               {q.opts.map((o,i)=>(
-                <button key={i} onClick={()=>{const a=[...ans];a[cur]=i;setAns(a);}} className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all ${ans[cur]===i?'border-red-600 bg-red-50':'border-slate-100 hover:border-slate-300 bg-slate-50/50'}`}>
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all ${ans[cur]===i?'bg-red-600 text-white':'bg-white border-2 border-slate-300 text-slate-500'}`}>{String.fromCharCode(65+i)}</div>
-                  <span className={`text-sm ${ans[cur]===i?'text-red-700 font-medium':'text-slate-700'}`}>{o}</span>
+                <button key={i} onClick={()=>{const a=[...ans];a[cur]=i;setAns(a);}} className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all ${ans[cur]===i?'border-emerald-600 bg-emerald-50':'border-slate-100 hover:border-slate-300 bg-slate-50/50'}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all ${ans[cur]===i?'bg-emerald-600 text-white':'bg-white border-2 border-slate-300 text-slate-500'}`}>{String.fromCharCode(65+i)}</div>
+                  <span className={`text-sm ${ans[cur]===i?'text-emerald-700 font-medium':'text-slate-700'}`}>{o}</span>
                 </button>
               ))}
             </div>
@@ -1346,8 +1346,8 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
           <div className="flex gap-3">
             <button onClick={()=>setCur(c=>Math.max(0,c-1))} disabled={cur===0} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl text-sm disabled:opacity-40 hover:bg-slate-600">← Trước</button>
             {cur<qs.length-1
-              ? <button onClick={()=>setCur(c=>c+1)} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700">Câu tiếp →</button>
-              : <button onClick={()=>setConfirm(true)} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600">Nộp bài ✓</button>
+              ? <button onClick={()=>setCur(c=>c+1)} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700">Câu tiếp →</button>
+              : <button onClick={()=>setConfirm(true)} className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600">Nộp bài ✓</button>
             }
           </div>
         </div>
@@ -1356,16 +1356,16 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
             <div className="text-sm font-semibold text-slate-700 mb-3">Bảng câu hỏi</div>
             <div className="grid grid-cols-5 sm:grid-cols-4 gap-1.5 mb-4">
               {qs.map((_,i)=>(
-                <button key={i} onClick={()=>setCur(i)} className={`w-9 h-9 rounded-lg text-xs font-medium transition-all ${i===cur?'bg-red-600 text-white':ans[i]!==-1?'bg-emerald-100 text-emerald-700 border border-emerald-200':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{i+1}</button>
+                <button key={i} onClick={()=>setCur(i)} className={`w-9 h-9 rounded-lg text-xs font-medium transition-all ${i===cur?'bg-[#0B4F32] text-white ring-2 ring-emerald-400':ans[i]!==-1?'bg-emerald-100 text-emerald-700 border border-emerald-200':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{i+1}</button>
               ))}
             </div>
             <div className="space-y-1.5 text-xs text-slate-400 mb-4">
-              <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-600 rounded"/>Đang xem</div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 bg-[#0B4F32] ring-2 ring-emerald-400 rounded"/>Đang xem</div>
               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-100 border border-emerald-300 rounded"/>Đã trả lời</div>
               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-slate-100 rounded"/>Chưa trả lời</div>
             </div>
             <div className="pt-3 border-t border-slate-100 text-xs text-slate-500 mb-3">Đã trả lời: <span className="font-bold text-slate-700">{done}/{qs.length}</span></div>
-            <button onClick={()=>setConfirm(true)} className="w-full py-2 bg-red-500 text-white rounded-xl text-xs font-medium hover:bg-red-600">Nộp bài</button>
+            <button onClick={()=>setConfirm(true)} className="w-full py-2 bg-emerald-500 text-white rounded-xl text-xs font-medium hover:bg-emerald-600">Nộp bài</button>
           </div>
         </div>
       </div>
@@ -1376,7 +1376,7 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
             <p className="text-sm text-slate-500 mb-4">Đã trả lời {done}/{qs.length} câu.{done<qs.length&&` Còn ${qs.length-done} câu chưa trả lời.`}</p>
             <div className="flex gap-2">
               <button onClick={()=>setConfirm(false)} className="flex-1 py-2 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Tiếp tục làm</button>
-              <button onClick={()=>submit(ans)} className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600">Nộp bài</button>
+              <button onClick={()=>submit(ans)} className="flex-1 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600">Nộp bài</button>
             </div>
           </div>
         </div>
@@ -1392,7 +1392,7 @@ const ResultScreen = ({result, exam, questions, onBack}) => {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-2xl mx-auto p-4 md:p-6">
-        <div className={`rounded-2xl p-8 text-center mb-6 text-white ${ok?'bg-red-500':'bg-red-500'}`}>
+        <div className={`rounded-2xl p-8 text-center mb-6 text-white ${ok?'bg-emerald-500':'bg-red-500'}`}>
           <div className="text-5xl mb-3">{ok?'🎉':'😔'}</div>
           <div className="text-4xl font-bold mb-1">{result.score}%</div>
           <div className="text-base font-medium opacity-90 mb-2">{ok?'Chúc mừng! Bạn đã đạt yêu cầu':'Bạn chưa đạt yêu cầu lần này'}</div>
@@ -1412,7 +1412,7 @@ const ResultScreen = ({result, exam, questions, onBack}) => {
                 </div>
                 <div className="pl-8 space-y-1">
                   {q.opts.map((o,j)=>(
-                    <div key={j} className={`text-xs px-3 py-1.5 rounded-lg ${j===q.ans?'bg-red-50 text-red-700 font-medium':j===ua&&!correct?'bg-red-50 text-red-600':'text-slate-500'}`}>
+                    <div key={j} className={`text-xs px-3 py-1.5 rounded-lg ${j===q.ans?'bg-emerald-50 text-emerald-700 font-medium':j===ua&&!correct?'bg-red-50 text-red-600':'text-slate-500'}`}>
                       {String.fromCharCode(65+j)}. {o}{j===q.ans?' ✓':''}{j===ua&&!correct?' ✗ (bạn chọn)':''}
                     </div>
                   ))}
@@ -1421,13 +1421,91 @@ const ResultScreen = ({result, exam, questions, onBack}) => {
             );
           })}
         </div>
-        <button onClick={onBack} className="w-full py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700">← Quay lại trang chủ</button>
+        <button onClick={onBack} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700">← Quay lại trang chủ</button>
       </div>
     </div>
   );
 };
 
 // ── LOGIN ──
+// Ngôi sao 5 cánh dạng polygon
+const starPts = (cx, cy, r, ri) => Array.from({length:10}, (_,i)=>{
+  const R = i%2 ? ri : r, a = -Math.PI/2 + i*Math.PI/5;
+  return `${(cx+R*Math.cos(a)).toFixed(2)},${(cy+R*Math.sin(a)).toFixed(2)}`;
+}).join(' ');
+
+// Quốc huy: vòng nguyệt quế + khiên + sao (SVG thuần, không cần file ảnh)
+const Emblem = ({size=92}) => {
+  const branch = (
+    <g>
+      <path d="M45 91 C28 87 16 73 13 53" fill="none" stroke="#166534" strokeWidth="2.2" strokeLinecap="round"/>
+      {Array.from({length:9}, (_,i)=>{
+        const th = (100 + i*12) * Math.PI/180, s = 1 - i*0.045;
+        const x = 50 + 39*Math.cos(th), y = 52 + 39*Math.sin(th);
+        return <ellipse key={i} cx={x} cy={y} rx={7.2*s} ry={3.2*s} fill={i%2?'#15803d':'#166534'}
+                        transform={`rotate(${th*180/Math.PI+90} ${x} ${y})`}/>;
+      })}
+    </g>
+  );
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-md">
+      <defs>
+        <linearGradient id="em-shield" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ef4444"/><stop offset="100%" stopColor="#991b1b"/>
+        </linearGradient>
+      </defs>
+      {branch}
+      <g transform="translate(100,0) scale(-1,1)">{branch}</g>
+      <path d="M50 7 L78 17 V45 C78 61 66 74 50 82 C34 74 22 61 22 45 V17 Z"
+            fill="url(#em-shield)" stroke="#facc15" strokeWidth="2.5" strokeLinejoin="round"/>
+      <polygon points={starPts(50,43,19,8)} fill="#fde047" stroke="#f59e0b" strokeWidth="0.8"/>
+    </svg>
+  );
+};
+
+// Nền: sóng xanh + watermark trụ sở và ngôi sao
+const LoginBackdrop = () => (
+  <div className="absolute inset-0 overflow-hidden bg-[#f5faf6]" aria-hidden>
+    <div className="absolute -top-48 -right-40 w-[40rem] h-[40rem] rounded-full bg-emerald-200/30 blur-3xl"/>
+    <div className="absolute -bottom-32 -left-32 w-[34rem] h-[34rem] rounded-full bg-green-300/20 blur-3xl"/>
+
+    <svg viewBox="0 0 300 240" className="absolute left-0 bottom-16 w-[26rem] max-w-[45vw] text-emerald-900/[0.07]" fill="currentColor">
+      <rect x="10" y="206" width="280" height="14"/>
+      <rect x="55" y="192" width="190" height="14"/>
+      <rect x="48" y="92" width="204" height="100"/>
+      <polygon points="38,92 150,48 262,92"/>
+      {Array.from({length:6},(_,i)=><rect key={i} x={64+i*32} y="104" width="16" height="88" className="text-emerald-900/[0.12]"/>)}
+      <rect x="147" y="6" width="3" height="44"/>
+      <polygon points="150,10 190,20 150,30"/>
+    </svg>
+
+    <svg viewBox="0 0 100 100" className="absolute right-4 top-[22%] w-64 max-w-[30vw] text-emerald-800/[0.06]">
+      <polygon points={starPts(50,50,44,19)} fill="currentColor"/>
+      <circle cx="50" cy="50" r="47" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+
+    <svg className="absolute inset-x-0 bottom-0 w-full h-[38vh] min-h-[220px]" viewBox="0 0 1440 320" preserveAspectRatio="none">
+      <path fill="#bbf7d0" fillOpacity=".5"  d="M0,190 C240,280 480,140 720,180 C960,220 1200,290 1440,196 L1440,320 L0,320 Z"/>
+      <path fill="#22c55e" fillOpacity=".22" d="M0,246 C260,318 520,198 780,236 C1040,274 1240,318 1440,248 L1440,320 L0,320 Z"/>
+      <path fill="#15803d" fillOpacity=".92" d="M0,292 C300,332 600,258 900,282 C1140,302 1290,318 1440,290 L1440,320 L0,320 Z"/>
+    </svg>
+  </div>
+);
+
+const StarDivider = () => (
+  <div className="flex items-center justify-center gap-3 my-5">
+    <span className="h-px w-16 sm:w-24 bg-gradient-to-r from-transparent to-emerald-400/70"/>
+    <Star size={12} className="text-emerald-600 fill-emerald-600"/>
+    <span className="h-px w-16 sm:w-24 bg-gradient-to-l from-transparent to-emerald-400/70"/>
+  </div>
+);
+
+const BackBtn = ({onClick}) => (
+  <button onClick={onClick} className="text-emerald-800/70 hover:text-emerald-900 text-xs mb-4 inline-flex items-center gap-1.5 transition-colors">
+    <ArrowLeft size={13}/> Quay lại
+  </button>
+);
+
 const Login = ({onLogin, employees}) => {
   const [step, setStep] = useState('role'); // 'role' | 'admin' | 'dept' | 'employee'
   const [adminForm, setAdminForm] = useState({user:'', pass:'', err:''});
@@ -1447,117 +1525,139 @@ const Login = ({onLogin, employees}) => {
   const back = (to) => { setStep(to); setAdminForm({user:'',pass:'',err:''}); setSelectedDept(''); };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm sm:max-w-sm">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-600/25"><Shield size={28} className="text-white"/></div>
-          <h1 className="text-2xl font-bold text-white">Cục hậu cần - kỹ thuật Quân khu 4</h1>
-          <p className="text-slate-400 mt-1 text-sm">Hệ thống thi trắc nghiệm nội bộ</p>
+    <div className="relative min-h-screen flex items-center justify-center p-4 sm:p-8">
+      <LoginBackdrop/>
+
+      <div className="relative w-full max-w-3xl rounded-[2rem] bg-white/75 backdrop-blur-xl border border-white/70 shadow-[0_30px_80px_-25px_rgba(6,78,59,0.35)] px-5 py-8 sm:px-14 sm:py-11">
+        {/* HEADER */}
+        <div className="text-center">
+          <div className="flex justify-center"><Emblem/></div>
+          <h1 className="mt-3 text-xl sm:text-3xl font-bold text-[#0B4F32] tracking-tight">Cục hậu cần - kỹ thuật Quân khu 4</h1>
+          <p className="mt-1.5 text-slate-600 text-sm">Hệ thống thi trắc nghiệm nội bộ</p>
+          <StarDivider/>
         </div>
 
-        {/* STEP 1: Chọn vai trò */}
-        {step==='role' && (
-          <div className="space-y-3">
-            <p className="text-slate-400 text-xs text-center mb-4">Chọn vai trò của bạn để đăng nhập</p>
-            {[
-              {key:'admin', em:'👔', tt:'Quản trị viên', sub:'Quản lý câu hỏi, đề thi & báo cáo', to:'admin'},
-              {key:'emp',   em:'👤', tt:'Thí sinh',     sub:'Tham gia thi và xem kết quả',          to:'dept'},
-            ].map(item=>(
-              <button key={item.key} onClick={()=>setStep(item.to)} className="w-full bg-white/8 hover:bg-white/15 border border-white/15 text-white p-4 rounded-xl text-left transition-all group">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-xl">{item.em}</div>
-                  <div className="flex-1"><div className="font-semibold text-sm">{item.tt}</div><div className="text-slate-400 text-xs">{item.sub}</div></div>
-                  <ChevronRight size={16} className="text-slate-500 group-hover:text-white transition-colors"/>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* STEP 2A: Đăng nhập Admin */}
-        {step==='admin' && (
-          <div>
-            <button onClick={()=>back('role')} className="text-slate-400 hover:text-white text-xs mb-5 flex items-center gap-1">← Quay lại</button>
-            <div className="bg-white/8 border border-white/15 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center gap-2.5 mb-1">
-                <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center text-lg">👔</div>
-                <div><div className="text-white font-semibold text-sm">Quản trị viên</div><div className="text-slate-400 text-xs">Nhập thông tin đăng nhập</div></div>
-              </div>
-              <div>
-                <label className="text-slate-400 text-xs mb-1 block">Tên đăng nhập</label>
-                <input
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-3.5 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-red-600"
-                  placeholder="Nhập tên đăng nhập"
-                  value={adminForm.user}
-                  onChange={e=>setAdminForm(f=>({...f,user:e.target.value,err:''}))}
-                  onKeyDown={e=>e.key==='Enter'&&handleAdminLogin()}
-                />
-              </div>
-              <div>
-                <label className="text-slate-400 text-xs mb-1 block">Mật khẩu</label>
-                <input
-                  type="password"
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-3.5 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-red-600"
-                  placeholder="Nhập mật khẩu"
-                  value={adminForm.pass}
-                  onChange={e=>setAdminForm(f=>({...f,pass:e.target.value,err:''}))}
-                  onKeyDown={e=>e.key==='Enter'&&handleAdminLogin()}
-                />
-              </div>
-              {adminForm.err && (
-                <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/30 rounded-xl px-3 py-2">
-                  <AlertCircle size={14} className="text-red-400 flex-shrink-0"/>
-                  <span className="text-red-300 text-xs">{adminForm.err}</span>
-                </div>
-              )}
-              <button onClick={handleAdminLogin} className="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl text-sm font-medium transition-colors">
-                Đăng nhập
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2B: Chọn đơn vị */}
-        {step==='dept' && (
-          <div>
-            <button onClick={()=>back('role')} className="text-slate-400 hover:text-white text-xs mb-4 flex items-center gap-1">← Quay lại</button>
-            <p className="text-slate-400 text-xs text-center mb-4">Chọn đơn vị</p>
-            <div className="space-y-2">
-              {depts.map(dept=>{
-                const count = employees.filter(e=>e.dept===dept).length;
-                return (
-                  <button key={dept} onClick={()=>{setSelectedDept(dept);setStep('employee');}} className="w-full bg-white/8 hover:bg-white/15 border border-white/15 text-white p-4 rounded-xl text-left transition-all group flex items-center gap-3">
-                    <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center text-base">🏢</div>
-                    <div className="flex-1"><div className="font-medium text-sm">{dept}</div><div className="text-slate-400 text-xs">{count} thí sinh</div></div>
-                    <ChevronRight size={15} className="text-slate-500 group-hover:text-white transition-colors"/>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: Chọn thí sinh */}
-        {step==='employee' && (
-          <div>
-            <button onClick={()=>setStep('dept')} className="text-slate-400 hover:text-white text-xs mb-4 flex items-center gap-1">← Quay lại</button>
-            <div className="flex items-center gap-2 mb-4 px-1">
-              <span className="text-slate-400 text-xs">Đơn vị:</span>
-              <span className="bg-red-600/20 text-red-300 text-xs px-2.5 py-1 rounded-full font-medium">{selectedDept}</span>
-            </div>
-            <p className="text-slate-400 text-xs text-center mb-3">Chọn tên của bạn</p>
-            <div className="space-y-2">
-              {deptEmployees.map(emp=>(
-                <button key={emp.id} onClick={()=>onLogin({role:'employee',...emp})} className="w-full bg-white/8 hover:bg-white/15 border border-white/15 text-white p-3.5 rounded-xl text-left transition-all flex items-center gap-3">
-                  <Avatar name={emp.name} sz="md"/>
-                  <div><div className="font-medium text-sm">{emp.name}</div><div className="text-slate-400 text-xs">{emp.dept}</div></div>
-                  <ChevronRight size={15} className="text-slate-500 ml-auto"/>
+        <div className="mx-auto w-full max-w-lg">
+          {/* STEP 1: Chọn vai trò */}
+          {step==='role' && (
+            <div className="space-y-3">
+              <p className="text-slate-500 text-xs text-center mb-5">Chọn vai trò của bạn để đăng nhập</p>
+              {[
+                {key:'admin', em:'👔', tt:'Quản trị viên', sub:'Quản lý câu hỏi, đề thi & báo cáo', to:'admin',
+                 tile:'bg-emerald-100', ring:'hover:border-emerald-300', dot:'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600'},
+                {key:'emp',   em:'👤', tt:'Thí sinh',     sub:'Tham gia thi và xem kết quả',      to:'dept',
+                 tile:'bg-violet-100', ring:'hover:border-violet-300',  dot:'bg-violet-50 text-violet-700 group-hover:bg-violet-600'},
+              ].map(item=>(
+                <button key={item.key} onClick={()=>setStep(item.to)}
+                        className={`group w-full bg-white border border-slate-200/80 ${item.ring} shadow-sm hover:shadow-lg hover:-translate-y-0.5 rounded-2xl p-4 sm:p-5 text-left transition-all`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 sm:w-14 sm:h-14 ${item.tile} rounded-2xl flex items-center justify-center text-2xl flex-shrink-0`}>{item.em}</div>
+                    <div className="h-10 w-px bg-slate-200 hidden sm:block"/>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-[#0B4F32] text-base">{item.tt}</div>
+                      <div className="text-slate-500 text-xs mt-0.5">{item.sub}</div>
+                    </div>
+                    <div className={`w-9 h-9 rounded-full ${item.dot} flex items-center justify-center group-hover:text-white transition-colors flex-shrink-0`}>
+                      <ArrowRight size={16}/>
+                    </div>
+                  </div>
                 </button>
               ))}
-              {deptEmployees.length===0 && <p className="text-center text-slate-500 text-sm py-4">Không có thí sinh trong đơn vị này</p>}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* STEP 2A: Đăng nhập Admin */}
+          {step==='admin' && (
+            <div>
+              <BackBtn onClick={()=>back('role')}/>
+              <div className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-5 sm:p-6 space-y-4">
+                <div className="flex items-center gap-3 pb-1">
+                  <div className="w-11 h-11 bg-emerald-100 rounded-2xl flex items-center justify-center text-xl">👔</div>
+                  <div><div className="text-[#0B4F32] font-bold text-sm">Quản trị viên</div><div className="text-slate-500 text-xs">Nhập thông tin đăng nhập</div></div>
+                </div>
+                <div>
+                  <label className="text-slate-600 text-xs mb-1.5 block font-medium">Tên đăng nhập</label>
+                  <input
+                    className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition"
+                    placeholder="Nhập tên đăng nhập"
+                    value={adminForm.user}
+                    onChange={e=>setAdminForm(f=>({...f,user:e.target.value,err:''}))}
+                    onKeyDown={e=>e.key==='Enter'&&handleAdminLogin()}
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-600 text-xs mb-1.5 block font-medium">Mật khẩu</label>
+                  <input
+                    type="password"
+                    className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition"
+                    placeholder="Nhập mật khẩu"
+                    value={adminForm.pass}
+                    onChange={e=>setAdminForm(f=>({...f,pass:e.target.value,err:''}))}
+                    onKeyDown={e=>e.key==='Enter'&&handleAdminLogin()}
+                  />
+                </div>
+                {adminForm.err && (
+                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                    <AlertCircle size={14} className="text-emerald-500 flex-shrink-0"/>
+                    <span className="text-emerald-600 text-xs">{adminForm.err}</span>
+                  </div>
+                )}
+                <button onClick={handleAdminLogin} className="w-full bg-gradient-to-r from-[#0B4F32] to-emerald-600 hover:from-[#0a4429] hover:to-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-emerald-900/15 transition-all">
+                  Đăng nhập
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2B: Chọn đơn vị */}
+          {step==='dept' && (
+            <div>
+              <BackBtn onClick={()=>back('role')}/>
+              <p className="text-slate-500 text-xs text-center mb-4">Chọn đơn vị</p>
+              <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                {depts.map(dept=>{
+                  const count = employees.filter(e=>e.dept===dept).length;
+                  return (
+                    <button key={dept} onClick={()=>{setSelectedDept(dept);setStep('employee');}}
+                            className="group w-full bg-white border border-slate-200/80 hover:border-emerald-300 shadow-sm hover:shadow-md rounded-2xl p-4 text-left transition-all flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-base flex-shrink-0">🏢</div>
+                      <div className="flex-1 min-w-0"><div className="font-semibold text-sm text-[#0B4F32] truncate">{dept}</div><div className="text-slate-500 text-xs">{count} thí sinh</div></div>
+                      <ChevronRight size={16} className="text-slate-400 group-hover:text-emerald-600 transition-colors flex-shrink-0"/>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Chọn thí sinh */}
+          {step==='employee' && (
+            <div>
+              <BackBtn onClick={()=>setStep('dept')}/>
+              <div className="flex items-center gap-2 mb-4 px-1">
+                <span className="text-slate-500 text-xs">Đơn vị:</span>
+                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-2.5 py-1 rounded-full font-medium">{selectedDept}</span>
+              </div>
+              <p className="text-slate-500 text-xs text-center mb-3">Chọn tên của bạn</p>
+              <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                {deptEmployees.map(emp=>(
+                  <button key={emp.id} onClick={()=>onLogin({role:'employee',...emp})}
+                          className="group w-full bg-white border border-slate-200/80 hover:border-emerald-300 shadow-sm hover:shadow-md rounded-2xl p-3.5 text-left transition-all flex items-center gap-3">
+                    <Avatar name={emp.name} sz="md"/>
+                    <div className="min-w-0"><div className="font-semibold text-sm text-[#0B4F32] truncate">{emp.name}</div><div className="text-slate-500 text-xs truncate">{emp.dept}</div></div>
+                    <ChevronRight size={16} className="text-slate-400 group-hover:text-emerald-600 transition-colors ml-auto flex-shrink-0"/>
+                  </button>
+                ))}
+                {deptEmployees.length===0 && <p className="text-center text-slate-400 text-sm py-4">Không có thí sinh trong đơn vị này</p>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER */}
+        <div className="mt-9 flex items-center justify-center gap-2 text-emerald-900/60 text-xs">
+          <ShieldCheck size={14}/> Bảo mật - Chính xác - Hiệu quả
+        </div>
       </div>
     </div>
   );
@@ -1605,12 +1705,12 @@ const ExamResults = ({results, exams, employees, onClearAll}) => {
             {exams.map(exam=>{
               const count = results.filter(r=>r.examId===exam.id).length;
               return (
-                <button key={exam.id} onClick={()=>setSelId(exam.id)} className="text-left bg-white rounded-xl p-5 shadow-sm border border-slate-100 hover:border-red-300 hover:shadow transition-all">
+                <button key={exam.id} onClick={()=>setSelId(exam.id)} className="text-left bg-white rounded-xl p-5 shadow-sm border border-slate-100 hover:border-emerald-300 hover:shadow transition-all">
                   <h3 className="font-semibold text-slate-800 mb-1">{exam.title}</h3>
                   <p className="text-sm text-slate-500 mb-3 truncate">{exam.desc}</p>
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="flex items-center gap-1"><Users size={12}/>{count} lượt thi</span>
-                    <span className="flex items-center gap-1 text-red-600 font-medium">Xem <ChevronRight size={13}/></span>
+                    <span className="flex items-center gap-1 text-emerald-600 font-medium">Xem <ChevronRight size={13}/></span>
                   </div>
                 </button>
               );
@@ -1649,7 +1749,7 @@ const ExamResults = ({results, exams, employees, onClearAll}) => {
 
   return (
     <div>
-      <button onClick={()=>setSelId(null)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-red-600 mb-3"><ChevronRight size={15} className="rotate-180"/>Chọn đề thi khác</button>
+      <button onClick={()=>setSelId(null)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-emerald-600 mb-3"><ChevronRight size={15} className="rotate-180"/>Chọn đề thi khác</button>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
         <div>
           <h1 className="text-lg md:text-xl font-bold text-slate-800">{exam?.title||'Đề thi đã xóa'}</h1>
@@ -1754,9 +1854,7 @@ export default function App() {
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
-        <div className="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <Shield size={26} className="text-white"/>
-        </div>
+        <div className="flex justify-center mb-3 animate-pulse"><Emblem size={64}/></div>
         <p className="text-slate-500 text-sm">Đang tải dữ liệu...</p>
       </div>
     </div>
@@ -1784,7 +1882,7 @@ export default function App() {
   return (
     <div className="flex bg-slate-50 min-h-screen">
       <Sidebar role={user.role} active={view} setActive={setView} user={user} onLogout={logout}/>
-      <div className="flex-1 md:ml-56 overflow-auto pt-14 md:pt-0 pb-16 md:pb-0">
+      <div className="flex-1 md:ml-64 overflow-auto pt-14 md:pt-0 pb-16 md:pb-0">
         <div className="p-3 sm:p-4 md:p-7">{user.role==="admin"?adminViews[view]:empViews[view]}</div>
       </div>
     </div>
