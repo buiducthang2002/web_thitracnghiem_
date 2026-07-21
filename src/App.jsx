@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, XCircle, Award, Home, Play, TrendingUp, X, ChevronRight, Shield, ShieldCheck, Star, ArrowRight, ArrowLeft, Upload, Download, AlertCircle } from "lucide-react";
+import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, XCircle, Award, Home, Play, TrendingUp, TrendingDown, X, ChevronRight, Shield, ShieldCheck, Star, ArrowRight, ArrowLeft, Upload, Download, AlertCircle, Info, FileSearch, PieChart as PieChartIcon } from "lucide-react";
 import { db } from "./firebase";
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
@@ -21,6 +21,33 @@ const Avatar = ({name, sz="md"}) => {
 };
 const Badge = ({ok}) => <span className={`text-sm font-bold ${ok?'text-emerald-500':'text-red-400'}`}>{ok?'✓':'✗'}</span>;
 
+// Trạng thái rỗng dùng chung
+const EmptyState = ({icon, title, sub}) => (
+  <div className="flex flex-col items-center justify-center text-center py-6">
+    <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 mb-2.5">{icon}</div>
+    <div className="text-sm font-medium text-slate-500">{title}</div>
+    {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
+  </div>
+);
+
+// Khung trục giả cho biểu đồ khi chưa có dữ liệu
+const ChartPlaceholder = ({cols, title, sub, icon}) => (
+  <div className="relative h-[240px]">
+    <div className="absolute inset-0 flex flex-col justify-between pb-7">
+      {[100,75,50,25,0].map(v=>(
+        <div key={v} className="flex items-center gap-2">
+          <span className="w-9 text-right text-[11px] text-slate-400 flex-shrink-0">{v}%</span>
+          <div className="flex-1 border-t border-dashed border-slate-100"/>
+        </div>
+      ))}
+    </div>
+    <div className="absolute bottom-0 left-11 right-0 flex justify-around">
+      {cols.map(c=><span key={c} className="text-[11px] text-slate-400">{c}</span>)}
+    </div>
+    <div className="absolute inset-0 flex items-center justify-center"><EmptyState icon={icon} title={title} sub={sub}/></div>
+  </div>
+);
+
 // Stable question order: by explicit `order`; legacy questions without one keep id order and stay first
 const orderedQuestions = (qs) => [...qs].sort((a,b)=>{
   if(a.order!=null && b.order!=null) return a.order-b.order;
@@ -30,58 +57,68 @@ const orderedQuestions = (qs) => [...qs].sort((a,b)=>{
 
 
 // ── SIDEBAR (desktop) + MOBILE NAV ──
-const Sidebar = ({role, active, setActive, user, onLogout}) => {
+const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
   const nav = role==='admin'
-    ? [{id:'dashboard',ic:<Home size={17}/>,lb:'Tổng quan'},{id:'questions',ic:<BookOpen size={17}/>,lb:'Câu hỏi'},{id:'exams',ic:<FileText size={17}/>,lb:'Đề thi'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả'},{id:'employees',ic:<Users size={17}/>,lb:'Thí sinh'}]
-    : [{id:'home',ic:<Home size={17}/>,lb:'Trang chủ'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả'}];
+    ? [{id:'dashboard',ic:<Home size={18}/>,lb:'Tổng quan'},{id:'questions',ic:<BookOpen size={18}/>,lb:'Câu hỏi'},{id:'exams',ic:<FileText size={18}/>,lb:'Đề thi'},{id:'results',ic:<Award size={18}/>,lb:'Kết quả'},{id:'employees',ic:<Users size={18}/>,lb:'Thí sinh'}]
+    : [{id:'home',ic:<Home size={18}/>,lb:'Trang chủ'},{id:'results',ic:<Award size={18}/>,lb:'Kết quả'}];
   return (
     <>
       {/* Desktop sidebar */}
-      <div className="hidden md:flex w-64 bg-green-950 h-screen flex-col fixed left-0 top-0 z-10">
-        <div className="p-4 border-b border-green-800/50 flex flex-col items-center gap-2 text-center">
-          <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={15} className="text-white"/></div>
-          <div><div className="text-white font-bold text-[11px] leading-tight whitespace-nowrap">Cục hậu cần - kỹ thuật Quân khu 4</div><div className="text-slate-400 text-[10px] whitespace-nowrap">Hệ thống thi trắc nghiệm</div></div>
+      <div className={`hidden md:flex ${rail?'w-[78px]':'w-[168px]'} bg-white h-screen flex-col fixed left-0 top-0 z-10 border-r border-slate-200/80 transition-[width] duration-200`}>
+        <div className="py-5 flex flex-col items-center gap-1.5 flex-shrink-0">
+          <Emblem size={rail?52:76}/>
+          {!rail && <div className="text-[10px] font-bold text-[#0B4F32] text-center leading-tight px-2">Quân khu 4</div>}
         </div>
-        <nav className="flex-1 p-2.5 space-y-0.5">
+
+        <nav className="flex-1 px-2.5 space-y-1.5 relative">
           {nav.map(i=>(
-            <button key={i.id} onClick={()=>setActive(i.id)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-all ${active===i.id?'bg-emerald-600 text-white':'text-slate-400 hover:text-white hover:bg-green-900'}`}>
-              {i.ic}<span>{i.lb}</span>
+            <button key={i.id} onClick={()=>setActive(i.id)} title={i.lb}
+              className={`w-full flex items-center ${rail?'justify-center':'gap-2.5 px-3'} py-2.5 rounded-xl text-[13px] font-medium transition-all ${active===i.id?'bg-[#0B4F32] text-white shadow-md shadow-emerald-900/20':'text-slate-500 hover:bg-emerald-50 hover:text-[#0B4F32]'}`}>
+              {i.ic}{!rail && <span className="truncate">{i.lb}</span>}
             </button>
           ))}
         </nav>
-        <div className="p-2.5 border-t border-green-800/50">
-          <div className="flex items-center gap-2 px-2 py-1.5">
+
+        <div className="p-2.5 border-t border-slate-100 flex-shrink-0 relative">
+          <div className={`flex items-center ${rail?'justify-center':'gap-2'} py-1`}>
             <Avatar name={user.name} sz="sm"/>
-            <div className="flex-1 min-w-0">
-              <div className="text-white text-xs font-medium truncate">{user.name}</div>
-              <div className="text-slate-400 text-xs">{role==='admin'?'Quản trị viên':user.dept}</div>
-            </div>
-            <button onClick={onLogout} className="text-slate-400 hover:text-red-400"><LogOut size={14}/></button>
+            {!rail && (
+              <div className="flex-1 min-w-0">
+                <div className="text-slate-700 text-[11px] font-semibold truncate">{user.name}</div>
+                <div className="text-slate-400 text-[10px] truncate">{role==='admin'?'Quản trị viên':user.dept}</div>
+              </div>
+            )}
+          </div>
+          <div className={`flex items-center ${rail?'flex-col gap-1.5':'justify-between'} mt-1.5`}>
+            <button onClick={onLogout} title="Đăng xuất" className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><LogOut size={15}/></button>
+            <button onClick={()=>setRail(r=>!r)} title={rail?'Mở rộng':'Thu gọn'} className="p-1.5 rounded-lg text-slate-400 hover:text-[#0B4F32] hover:bg-emerald-50 transition-colors">
+              <ChevronRight size={16} className={rail?'':'rotate-180'}/>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-20 bg-green-950 flex items-center justify-between px-4 py-2.5 border-b border-green-800/50">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-20 bg-white flex items-center justify-between px-3 py-2 border-b border-slate-200">
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-7 h-7 bg-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={13} className="text-white"/></div>
+          <Emblem size={34}/>
           <div>
-            <div className="text-white font-bold text-[10px] leading-tight whitespace-nowrap">Cục hậu cần - kỹ thuật Quân khu 4</div>
+            <div className="text-[#0B4F32] font-bold text-[10px] leading-tight whitespace-nowrap">Cục hậu cần - kỹ thuật Quân khu 4</div>
             <div className="text-slate-400 text-[9px] whitespace-nowrap">Hệ thống thi trắc nghiệm</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-white text-xs truncate">{user.name.split(' ').pop()}</span>
-          <button onClick={onLogout} className="text-slate-400 hover:text-red-300 p-1"><LogOut size={15}/></button>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-slate-600 text-xs truncate">{user.name.split(' ').pop()}</span>
+          <button onClick={onLogout} className="text-slate-400 hover:text-red-500 p-1"><LogOut size={15}/></button>
         </div>
       </div>
 
       {/* Mobile bottom nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-green-950 border-t border-green-800/50 flex">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-slate-200 flex">
         {nav.map(i=>(
-          <button key={i.id} onClick={()=>setActive(i.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-all ${active===i.id?'text-emerald-400':'text-slate-500'}`}>
-            {i.ic}
-            <span className="text-[10px]">{i.lb}</span>
+          <button key={i.id} onClick={()=>setActive(i.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-all ${active===i.id?'text-[#0B4F32]':'text-slate-400'}`}>
+            <div className={`px-3 py-1 rounded-lg ${active===i.id?'bg-emerald-100':''}`}>{i.ic}</div>
+            <span className="text-[10px] font-medium">{i.lb}</span>
           </button>
         ))}
       </div>
@@ -764,11 +801,7 @@ const downloadTemplate = () => {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-emerald-100 rounded-xl flex items-center justify-center"><Users size={22} className="text-emerald-600"/></div>
-          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Thí sinh</h1><p className="text-slate-500 text-xs">{employees.length} thí sinh</p></div>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end mb-5 gap-3">
         <div className="flex flex-wrap gap-2">
           <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50"><Download size={14}/>Tải file mẫu</button>
           <button onClick={()=>fileRef.current.click()} disabled={importing} className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-60"><Upload size={14}/>{importing?'Đang import...':'Import Excel'}</button>
@@ -924,14 +957,33 @@ const Reports = ({results, exams, employees}) => {
     const emps = employees.filter(e=>e.dept===dept);
     const rs = results.filter(r=>emps.some(e=>e.id===r.empId));
     const passed = rs.filter(r=>{const e=exams.find(x=>x.id===r.examId);return e&&r.score>=e.pass;}).length;
+    // Same 3 buckets as the donut: Đạt ≥ điểm đạt, Trung bình 50–69%, Chưa đạt < 50%
+    const mid = rs.filter(r=>{const e=exams.find(x=>x.id===r.examId);return r.score>=50&&(!e||r.score<e.pass);}).length;
+    const low = rs.filter(r=>r.score<50).length;
     const avg = rs.length?Math.round(rs.reduce((a,r)=>a+r.score,0)/rs.length):0;
     const rate = rs.length?Math.round(passed/rs.length*100):0;
-    return {name:dept, attempts:rs.length, passed, failed:rs.length-passed, avg, rate};
+    return {name:dept, attempts:rs.length, passed, mid, low, failed:rs.length-passed, avg, rate};
   });
 
   const totalAttempts = results.length;
   const globalAvg = totalAttempts?Math.round(results.reduce((a,r)=>a+r.score,0)/totalAttempts):0;
   const bestDept = deptData.reduce((a,b)=>b.avg>a.avg?b:a, deptData[0]||{name:'--',avg:0});
+
+  // "So với kỳ trước" trên các thẻ thống kê: tháng hiện tại so với tháng liền trước.
+  // r.date được lưu dạng d/m/yyyy (toLocaleDateString('vi-VN')).
+  const monthIdx = d => { const [,m,y] = String(d||'').split('/').map(Number); return (m&&y) ? y*12+(m-1) : null; };
+  const curMonth  = new Date().getFullYear()*12 + new Date().getMonth();
+  const rsThis = results.filter(r=>monthIdx(r.date)===curMonth);
+  const rsPrev = results.filter(r=>monthIdx(r.date)===curMonth-1);
+  const pctChange = (cur,prev) => prev ? Math.round((cur-prev)/prev*100) : (cur?100:0);
+  const avgOf = rs => rs.length?Math.round(rs.reduce((a,r)=>a+r.score,0)/rs.length):0;
+  const deptCountOf = rs => new Set(rs.map(r=>employees.find(e=>e.id===r.empId)?.dept).filter(Boolean)).size;
+  const bestAvgOf = rs => {
+    const byDept = {};
+    rs.forEach(r=>{ const d=employees.find(e=>e.id===r.empId)?.dept; if(d) (byDept[d]=byDept[d]||[]).push(r.score); });
+    const avgs = Object.values(byDept).map(ss=>Math.round(ss.reduce((a,s)=>a+s,0)/ss.length));
+    return avgs.length?Math.max(...avgs):0;
+  };
 
   // Distribution: Đạt ≥ pass%, Trung bình 50-69%, Chưa đạt <50%
   const dat = results.filter(r=>{const e=exams.find(x=>x.id===r.examId);return e&&r.score>=e.pass;}).length;
@@ -993,46 +1045,60 @@ const Reports = ({results, exams, employees}) => {
     s3['!cols']=[{wch:22},{wch:18},{wch:16},{wch:14},{wch:18},{wch:14},{wch:18},{wch:18},{wch:14}];
     XLSX.utils.book_append_sheet(wb, s3, 'Danh sách thí sinh');
 
-    XLSX.writeFile(wb, `BaoCao_BenhVienQuanY4_${new Date().toLocaleDateString('vi-VN').replace(/\//g,'-')}.xlsx`);
+    XLSX.writeFile(wb, `Báo cáo_${new Date().toLocaleDateString('vi-VN').replace(/\//g,'-')}.xlsx`);
   };
-
-  const worstDept = deptData.reduce((a,b)=>b.avg<a.avg?b:a, deptData[0]||{name:'--'});
 
   return (
     <div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-emerald-100 rounded-xl flex items-center justify-center"><TrendingUp size={20} className="text-emerald-600"/></div>
-          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Báo cáo & Phân tích</h1><p className="text-slate-500 text-xs">Phân tích kết quả thi theo đơn vị</p></div>
+          <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center"><BarChart2 size={22} className="text-emerald-600"/></div>
+          <div><h1 className="text-xl md:text-2xl font-bold text-slate-800">Báo cáo & Phân tích</h1><p className="text-slate-500 text-xs md:text-sm">Phân tích kết quả thi theo đơn vị</p></div>
         </div>
-        <button onClick={exportExcel} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium">
-          <Download size={15}/>Xuất Excel <ChevronRight size={14} className="rotate-90"/>
+        <button onClick={exportExcel} className="flex items-center gap-2 bg-gradient-to-r from-[#0B4F32] to-emerald-600 hover:from-[#0a4429] hover:to-emerald-700 text-white px-5 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-emerald-900/20 transition-all">
+          <Download size={16}/>Xuất Excel <ChevronRight size={14} className="rotate-90 opacity-70"/>
         </button>
       </div>
 
-      {/* Stat cards with sparklines */}
+      {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          {ic:<BarChart2 size={18}/>, val:depts.length, lb:'Đơn vị', sub:'Đã có dữ liệu', icCol:'bg-teal-100 text-teal-600', spark:'#5eead4', path:'M0,20 C10,15 20,25 30,18 C40,10 50,22 60,16 C70,10 80,20 90,14'},
-          {ic:<CheckCircle size={18}/>, val:totalAttempts, lb:'Tổng lượt thi', sub:'Trong kỳ', icCol:'bg-emerald-100 text-emerald-600', spark:'#6ee7b7', path:'M0,22 C15,18 25,24 40,16 C55,8 65,20 80,14 C85,12 88,16 90,13'},
-          {ic:<TrendingUp size={18}/>, val:`${globalAvg}%`, lb:'Điểm TB chung', sub:'Toàn hệ thống', icCol:'bg-amber-100 text-amber-600', spark:'#fcd34d', path:'M0,24 C10,20 20,22 35,14 C50,6 60,18 75,12 C82,9 87,15 90,10'},
-          {ic:<Award size={18}/>, val:`${bestDept.avg}%`, lb:'Đơn vị cao nhất', sub:bestDept.name, icCol:'bg-violet-100 text-violet-600', spark:'#c4b5fd', path:'M0,20 C12,16 22,22 38,12 C54,2 62,18 78,10 C84,7 88,13 90,8'},
-        ].map((s,i)=>(
-          <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 overflow-hidden relative">
-            <div className="flex items-start gap-3 mb-3">
-              <div className={`w-10 h-10 ${s.icCol} rounded-xl flex items-center justify-center flex-shrink-0`}>{s.ic}</div>
-              <div>
-                <div className="text-2xl font-bold text-slate-800">{s.val}</div>
-                <div className="text-xs font-medium text-slate-600">{s.lb}</div>
-                <div className="text-xs text-slate-400">{s.sub}</div>
+          {ic:<BarChart2 size={18}/>, val:depts.length, lb:'Đơn vị', sub:'Đã có dữ liệu',
+           icCol:'bg-teal-100 text-teal-600', valCol:'text-teal-600', footBg:'bg-teal-50',
+           trend:pctChange(deptCountOf(rsThis), deptCountOf(rsPrev))},
+          {ic:<CheckCircle size={18}/>, val:totalAttempts, lb:'Tổng lượt thi', sub:'Trong kỳ',
+           icCol:'bg-emerald-100 text-emerald-600', valCol:'text-emerald-600', footBg:'bg-emerald-50',
+           trend:pctChange(rsThis.length, rsPrev.length)},
+          {ic:<TrendingUp size={18}/>, val:`${globalAvg}%`, lb:'Điểm TB chung', sub:'Toàn hệ thống',
+           icCol:'bg-amber-100 text-amber-600', valCol:'text-amber-500', footBg:'bg-amber-50',
+           trend:pctChange(avgOf(rsThis), avgOf(rsPrev))},
+          {ic:<Award size={18}/>, val:`${bestDept.avg}%`, lb:'Đơn vị cao nhất', sub:bestDept.name,
+           icCol:'bg-violet-100 text-violet-600', valCol:'text-violet-600', footBg:'bg-violet-50',
+           trend:pctChange(bestAvgOf(rsThis), bestAvgOf(rsPrev))},
+        ].map((s,i)=>{
+          const down = s.trend < 0;
+          return (
+            <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+              <div className="flex items-start gap-3">
+                <div className={`w-11 h-11 ${s.icCol} rounded-2xl flex items-center justify-center flex-shrink-0`}>{s.ic}</div>
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-2xl font-bold ${s.valCol} leading-tight flex-shrink-0`}>{s.val}</span>
+                    <span className="text-xs font-semibold text-slate-600 truncate">{s.lb}</span>
+                  </div>
+                  <div className="text-xs text-slate-400 truncate">{s.sub}</div>
+                </div>
+              </div>
+              <div className={`mt-3 ${s.footBg} rounded-xl px-3 py-2 flex items-center justify-between gap-2`}>
+                <span className={`flex items-center gap-1 text-xs font-bold flex-shrink-0 ${down?'text-red-500':s.valCol}`}>
+                  {down ? <TrendingDown size={13}/> : <TrendingUp size={13}/>}{Math.abs(s.trend)}%
+                </span>
+                <span className="text-xs text-slate-400 truncate">so với kỳ trước</span>
               </div>
             </div>
-            <svg viewBox="0 0 90 30" className="w-full h-8" preserveAspectRatio="none">
-              <path d={s.path} fill="none" stroke={s.spark} strokeWidth="2.5" strokeLinecap="round"/>
-            </svg>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Charts row */}
@@ -1050,59 +1116,74 @@ const Reports = ({results, exams, employees}) => {
               Điểm TB <ChevronRight size={12} className="rotate-90 text-slate-400"/>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={barData} margin={{left:-15,right:10,top:20}}>
-              <XAxis dataKey="name" tick={{fontSize:11}} axisLine={false} tickLine={false}/>
-              <YAxis domain={[0,100]} tick={{fontSize:11}} axisLine={false} tickLine={false} tickFormatter={v=>`${v}%`}/>
-              <Tooltip cursor={false} formatter={v=>[`${v}%`,'Điểm TB']}/>
-              <Bar dataKey="avg" radius={[6,6,0,0]} label={{position:'top',fontSize:11,fontWeight:600}}>
-                {barData.map((d,i)=><Cell key={i} fill={d.fill}/>)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          {/* Dept legend */}
-          <div className="flex flex-wrap gap-3 mt-2 justify-center">
-            {barData.map((d,i)=>(
-              <div key={i} className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-sm" style={{background:d.fill}}/>
-                <span className="text-xs text-slate-500">{d.name}</span>
+          {barData.length===0 ? (
+            <ChartPlaceholder
+              cols={[]}
+              icon={<PieChartIcon size={22}/>}
+              title="Chưa có dữ liệu để hiển thị"
+              sub="Dữ liệu sẽ được cập nhật khi có kết quả thi"/>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={barData} margin={{left:-15,right:10,top:20}}>
+                  <XAxis dataKey="name" tick={{fontSize:11}} axisLine={false} tickLine={false}/>
+                  <YAxis domain={[0,100]} tick={{fontSize:11}} axisLine={false} tickLine={false} tickFormatter={v=>`${v}%`}/>
+                  <Tooltip cursor={false} formatter={v=>[`${v}%`,'Điểm TB']}/>
+                  <Bar dataKey="avg" radius={[6,6,0,0]} label={{position:'top',fontSize:11,fontWeight:600}}>
+                    {barData.map((d,i)=><Cell key={i} fill={d.fill}/>)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              {/* Dept legend */}
+              <div className="flex flex-wrap gap-3 mt-2 justify-center">
+                {barData.map((d,i)=>(
+                  <div key={i} className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-sm" style={{background:d.fill}}/>
+                    <span className="text-xs text-slate-500">{d.name}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
 
         {/* Donut chart */}
         <div className="md:lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">Phân bố kết quả</h3>
           <div className="flex items-center gap-4">
-            <div className="relative flex-shrink-0">
-              <ResponsiveContainer width={180} height={180}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={58} outerRadius={82} dataKey="value" startAngle={90} endAngle={-270}>
-                    {pieData.map((d,i)=><Cell key={i} fill={d.c}/>)}
-                  </Pie>
-                  <Tooltip formatter={(v,n)=>[v+' lượt',n]}/>
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="relative flex-shrink-0 w-[180px] h-[180px] flex items-center justify-center">
+              {totalAttempts===0 ? (
+                <div className="w-[164px] h-[164px] rounded-full border-[22px] border-slate-100"/>
+              ) : (
+                <ResponsiveContainer width={180} height={180}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={58} outerRadius={82} dataKey="value" startAngle={90} endAngle={-270}>
+                      {pieData.map((d,i)=><Cell key={i} fill={d.c}/>)}
+                    </Pie>
+                    <Tooltip formatter={(v,n)=>[v+' lượt',n]}/>
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xl font-bold text-slate-800">{totalAttempts}</span>
+                <span className="text-2xl font-bold text-slate-800">{totalAttempts}</span>
                 <span className="text-xs text-slate-400">Tổng lượt thi</span>
               </div>
             </div>
-            <div className="flex-1 space-y-2.5">
+            <div className="flex-1 space-y-3.5">
               {pieData.map(d=>(
-                <div key={d.name}>
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{background:d.c}}/>
-                    <span className="text-xs text-slate-600">{d.name}</span>
+                <div key={d.name} className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5" style={{background:d.c}}/>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-slate-700 truncate">{d.name}</div>
+                    <div className="text-xs text-slate-400">{d.value} lượt</div>
                   </div>
-                  <div className="flex items-center justify-between text-xs pl-4">
-                    <span className="text-slate-400">{d.value} lượt</span>
-                    <span className="font-semibold text-slate-700">{totalAttempts?Math.round(d.value/totalAttempts*100):0}%</span>
-                  </div>
+                  <span className="text-sm font-bold text-slate-700 flex-shrink-0">{totalAttempts?Math.round(d.value/totalAttempts*100):0}%</span>
                 </div>
               ))}
             </div>
+          </div>
+          <div className="mt-5 flex items-center justify-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl py-2.5 px-3 text-xs text-emerald-700">
+            <Info size={14} className="flex-shrink-0"/> Dữ liệu được cập nhật theo thời gian thực
           </div>
         </div>
       </div>
@@ -1112,11 +1193,12 @@ const Reports = ({results, exams, employees}) => {
         <div className="px-5 py-4 border-b border-slate-100">
           <h3 className="text-sm font-semibold text-slate-700">Chi tiết kết quả theo đơn vị</h3>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[1000px]">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/50">
-              {['Đơn vị','Lượt thi','Đạt','Chưa đạt','Điểm TB','Tiến độ đạt','Xu hướng'].map(h=>(
-                <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
+              {['STT','Đơn vị','Lượt thi','Đạt (≥ 70%)','Trung bình (50–69%)','Chưa đạt (< 50%)','Điểm TB','Tiến độ đạt','Xu hướng'].map(h=>(
+                <th key={h} className="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
@@ -1128,6 +1210,7 @@ const Reports = ({results, exams, employees}) => {
               const barCol = d.rate>=80?'bg-emerald-500':d.rate>=60?'bg-amber-400':'bg-red-400';
               return (
                 <tr key={d.name} className="border-t border-slate-50 hover:bg-slate-50/40 transition-colors">
+                  <td className="px-5 py-4 text-sm text-slate-500">{i+1}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{background:barColors[i%barColors.length]+'20'}}>
@@ -1138,7 +1221,8 @@ const Reports = ({results, exams, employees}) => {
                   </td>
                   <td className="px-5 py-4 text-sm text-slate-600">{d.attempts}</td>
                   <td className="px-5 py-4 text-sm font-semibold text-emerald-600">{d.passed}</td>
-                  <td className="px-5 py-4 text-sm font-semibold text-red-500">{d.failed}</td>
+                  <td className="px-5 py-4 text-sm font-semibold text-amber-500">{d.mid}</td>
+                  <td className="px-5 py-4 text-sm font-semibold text-red-500">{d.low}</td>
                   <td className="px-5 py-4 text-sm font-bold text-slate-800">{d.avg}%</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
@@ -1160,32 +1244,13 @@ const Reports = ({results, exams, employees}) => {
                 </tr>
               );
             })}
+            {deptData.length===0 && (
+              <tr><td colSpan={9} className="px-5 py-6">
+                <EmptyState icon={<FileSearch size={22}/>} title="Chưa có dữ liệu" sub="Thông tin chi tiết sẽ hiển thị tại đây"/>
+              </td></tr>
+            )}
           </tbody>
         </table>
-      </div>
-
-      {/* Summary box */}
-      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex items-center gap-4 overflow-hidden relative">
-        <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-          <TrendingUp size={18} className="text-blue-600"/>
-        </div>
-        <div className="flex-1">
-          <div className="font-semibold text-blue-700 mb-1 text-sm">Nhận xét tổng quan</div>
-          <p className="text-sm text-slate-600">
-            Đơn vị <strong>{bestDept.name}</strong> đang có kết quả tốt nhất với {bestDept.avg}% điểm trung bình.
-            {worstDept&&worstDept.name!==bestDept.name&&<> <strong>{worstDept.name}</strong> cần cải thiện thêm để nâng cao chất lượng kết quả.</>}
-          </p>
-        </div>
-        {/* Decorative illustration */}
-        <div className="flex-shrink-0 opacity-20 select-none" aria-hidden>
-          <svg width="100" height="70" viewBox="0 0 100 70">
-            <rect x="5" y="40" width="12" height="25" rx="3" fill="#15803d"/>
-            <rect x="22" y="28" width="12" height="37" rx="3" fill="#4ade80"/>
-            <rect x="39" y="18" width="12" height="47" rx="3" fill="#15803d"/>
-            <rect x="56" y="30" width="12" height="35" rx="3" fill="#4ade80"/>
-            <circle cx="80" cy="28" r="18" fill="none" stroke="#15803d" strokeWidth="3"/>
-            <path d="M72 28 L78 34 L88 22" stroke="#15803d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-          </svg>
         </div>
       </div>
     </div>
@@ -1434,32 +1499,66 @@ const starPts = (cx, cy, r, ri) => Array.from({length:10}, (_,i)=>{
   return `${(cx+R*Math.cos(a)).toFixed(2)},${(cy+R*Math.sin(a)).toFixed(2)}`;
 }).join(' ');
 
-// Quốc huy: vòng nguyệt quế + khiên + sao (SVG thuần, không cần file ảnh)
-const Emblem = ({size=92}) => {
+// Nhánh nguyệt quế trái: lá và cành bám theo cùng một cung tròn
+const LAUREL = (() => {
+  const CX = 60, CY = 30, R = 38;
+  const at = (deg, r=R) => {
+    const t = deg*Math.PI/180;
+    return [CX + r*Math.cos(t), CY + r*Math.sin(t)];
+  };
+  const stem = Array.from({length:20}, (_,i)=>at(97 + i*(90/19)))
+    .map(([x,y],i)=>`${i?'L':'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const leaves = Array.from({length:9}, (_,i)=>{
+    const deg = 101 + i*10.5;                 // 101° (đáy) → 185° (mũi bên trái)
+    const [x,y] = at(deg, R + 3.5);
+    return {x, y, rot: deg + 90, s: 1 - i*0.045};
+  });
+  return {stem, leaves};
+})();
+
+// Bản vẽ SVG dự phòng, dùng khi chưa có file ảnh trong public/
+const EmblemSvg = ({size=100}) => {
   const branch = (
     <g>
-      <path d="M45 91 C28 87 16 73 13 53" fill="none" stroke="#166534" strokeWidth="2.2" strokeLinecap="round"/>
-      {Array.from({length:9}, (_,i)=>{
-        const th = (100 + i*12) * Math.PI/180, s = 1 - i*0.045;
-        const x = 50 + 39*Math.cos(th), y = 52 + 39*Math.sin(th);
-        return <ellipse key={i} cx={x} cy={y} rx={7.2*s} ry={3.2*s} fill={i%2?'#15803d':'#166534'}
-                        transform={`rotate(${th*180/Math.PI+90} ${x} ${y})`}/>;
-      })}
+      <path d={LAUREL.stem} fill="none" stroke="#15803d" strokeWidth="2.4" strokeLinecap="round"/>
+      {LAUREL.leaves.map((l,i)=>(
+        <ellipse key={i} cx={l.x} cy={l.y} rx={7.5*l.s} ry={3.4*l.s} fill={i%2?'#15803d':'#12693a'}
+                 transform={`rotate(${l.rot} ${l.x} ${l.y})`}/>
+      ))}
     </g>
   );
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-md">
+    <svg width={size} height={size*0.63} viewBox="0 0 120 76" className="drop-shadow-sm">
       <defs>
         <linearGradient id="em-shield" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ef4444"/><stop offset="100%" stopColor="#991b1b"/>
+          <stop offset="0%" stopColor="#d33b2c"/><stop offset="100%" stopColor="#a92418"/>
         </linearGradient>
       </defs>
       {branch}
-      <g transform="translate(100,0) scale(-1,1)">{branch}</g>
-      <path d="M50 7 L78 17 V45 C78 61 66 74 50 82 C34 74 22 61 22 45 V17 Z"
-            fill="url(#em-shield)" stroke="#facc15" strokeWidth="2.5" strokeLinejoin="round"/>
-      <polygon points={starPts(50,43,19,8)} fill="#fde047" stroke="#f59e0b" strokeWidth="0.8"/>
+      <g transform="translate(120,0) scale(-1,1)">{branch}</g>
+      <path d="M39 6 H81 A3 3 0 0 1 84 9 V38 C84 53 74 64 60 70 C46 64 36 53 36 38 V9 A3 3 0 0 1 39 6 Z"
+            fill="url(#em-shield)" stroke="#8f2016" strokeWidth="3" strokeLinejoin="round"/>
+      <polygon points={starPts(60,34,16,6.6)} fill="#f7c744"/>
     </svg>
+  );
+};
+
+// Quốc huy: ưu tiên file ảnh trong public/, không có thì tự vẽ bằng SVG.
+// Đặt file của bạn vào public/ với một trong các tên dưới đây (hoặc sửa lại danh sách).
+const EMBLEM_SRCS = ['/quochuy.svg', '/quochuy.png', '/quochuy.jpg', '/quochuy.webp'];
+const Emblem = ({size=100, className=''}) => {
+  const [tried, setTried] = useState(0);
+  if (tried >= EMBLEM_SRCS.length) return <EmblemSvg size={size}/>;
+  return (
+    <img
+      key={tried}
+      src={EMBLEM_SRCS[tried]}
+      onError={()=>setTried(t=>t+1)}
+      alt="Quốc huy"
+      width={size}
+      draggable={false}
+      className={`h-auto select-none ${className}`}
+    />
   );
 };
 
@@ -1531,7 +1630,7 @@ const Login = ({onLogin, employees}) => {
       <div className="relative w-full max-w-3xl rounded-[2rem] bg-white/75 backdrop-blur-xl border border-white/70 shadow-[0_30px_80px_-25px_rgba(6,78,59,0.35)] px-5 py-8 sm:px-14 sm:py-11">
         {/* HEADER */}
         <div className="text-center">
-          <div className="flex justify-center"><Emblem/></div>
+          <div className="flex justify-center"><Emblem size={128}/></div>
           <h1 className="mt-3 text-xl sm:text-3xl font-bold text-[#0B4F32] tracking-tight">Cục hậu cần - kỹ thuật Quân khu 4</h1>
           <p className="mt-1.5 text-slate-600 text-sm">Hệ thống thi trắc nghiệm nội bộ</p>
           <StarDivider/>
@@ -1793,6 +1892,7 @@ const ExamResults = ({results, exams, employees, onClearAll}) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('dashboard');
+  const [rail, setRail] = useState(false);   // sidebar thu gọn
   const [employees, setEmployees] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [exams, setExams] = useState([]);
@@ -1854,7 +1954,7 @@ export default function App() {
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
-        <div className="flex justify-center mb-3 animate-pulse"><Emblem size={64}/></div>
+        <div className="flex justify-center mb-3 animate-pulse"><Emblem size={96}/></div>
         <p className="text-slate-500 text-sm">Đang tải dữ liệu...</p>
       </div>
     </div>
@@ -1881,8 +1981,8 @@ export default function App() {
 
   return (
     <div className="flex bg-slate-50 min-h-screen">
-      <Sidebar role={user.role} active={view} setActive={setView} user={user} onLogout={logout}/>
-      <div className="flex-1 md:ml-64 overflow-auto pt-14 md:pt-0 pb-16 md:pb-0">
+      <Sidebar role={user.role} active={view} setActive={setView} user={user} onLogout={logout} rail={rail} setRail={setRail}/>
+      <div className={`flex-1 ${rail?'md:ml-[78px]':'md:ml-[168px]'} overflow-auto pt-14 md:pt-0 pb-16 md:pb-0 transition-[margin] duration-200`}>
         <div className="p-3 sm:p-4 md:p-7">{user.role==="admin"?adminViews[view]:empViews[view]}</div>
       </div>
     </div>
