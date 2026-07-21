@@ -32,7 +32,7 @@ const orderedQuestions = (qs) => [...qs].sort((a,b)=>{
 // ── SIDEBAR (desktop) + MOBILE NAV ──
 const Sidebar = ({role, active, setActive, user, onLogout}) => {
   const nav = role==='admin'
-    ? [{id:'dashboard',ic:<Home size={17}/>,lb:'Tổng quan'},{id:'questions',ic:<BookOpen size={17}/>,lb:'Câu hỏi'},{id:'exams',ic:<FileText size={17}/>,lb:'Đề thi'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả'},{id:'employees',ic:<Users size={17}/>,lb:'Nhân viên'}]
+    ? [{id:'dashboard',ic:<Home size={17}/>,lb:'Tổng quan'},{id:'questions',ic:<BookOpen size={17}/>,lb:'Câu hỏi'},{id:'exams',ic:<FileText size={17}/>,lb:'Đề thi'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả'},{id:'employees',ic:<Users size={17}/>,lb:'Thí sinh'}]
     : [{id:'home',ic:<Home size={17}/>,lb:'Trang chủ'},{id:'results',ic:<Award size={17}/>,lb:'Kết quả'}];
   return (
     <>
@@ -40,7 +40,7 @@ const Sidebar = ({role, active, setActive, user, onLogout}) => {
       <div className="hidden md:flex w-56 bg-red-950 h-screen flex-col fixed left-0 top-0 z-10">
         <div className="p-4 border-b border-red-800/50 flex items-center gap-2.5">
           <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={15} className="text-white"/></div>
-          <div><div className="text-white font-bold text-sm leading-tight">Bệnh viện Quân y 4</div><div className="text-slate-400 text-xs">Hệ thống thi trắc nghiệm</div></div>
+          <div><div className="text-white font-bold text-sm leading-tight">Cục hậu cần - kỹ thuật Quân khu 4</div><div className="text-slate-400 text-xs">Hệ thống thi trắc nghiệm</div></div>
         </div>
         <nav className="flex-1 p-2.5 space-y-0.5">
           {nav.map(i=>(
@@ -66,7 +66,7 @@ const Sidebar = ({role, active, setActive, user, onLogout}) => {
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0"><Shield size={13} className="text-white"/></div>
           <div>
-            <div className="text-white font-bold text-xs leading-tight">Bệnh viện Quân y 4</div>
+            <div className="text-white font-bold text-xs leading-tight">Cục hậu cần - kỹ thuật Quân khu 4</div>
             <div className="text-slate-400 text-[10px]">Hệ thống thi trắc nghiệm</div>
           </div>
         </div>
@@ -160,7 +160,7 @@ const Dashboard = ({results, exams, questions, employees}) => {
         <div className="px-4 py-3 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-700">Kết quả gần đây</h3></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px]">
-            <thead><tr className="bg-slate-50">{['Nhân viên','Phòng ban','Đề thi','Điểm','Kết quả','Thời gian','Ngày'].map(h=><th key={h} className={`px-3 py-2 text-xs font-medium text-slate-400 uppercase ${h==='Kết quả'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
+            <thead><tr className="bg-slate-50">{['Thí sinh','Đơn vị','Đề thi','Điểm','Kết quả','Thời gian','Ngày'].map(h=><th key={h} className={`px-3 py-2 text-xs font-medium text-slate-400 uppercase ${h==='Kết quả'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
             <tbody>
               {recent.map(r=>{
                 const emp=employees.find(e=>e.id===r.empId); const exam=exams.find(e=>e.id===r.examId); const ok=exam&&r.score>=exam.pass;
@@ -584,14 +584,14 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
     const name = form.name.trim();
     const dept = form.dept === '__custom__' ? customDept.trim() : form.dept;
     if(!name) return setFormErr('Vui lòng nhập họ và tên');
-    if(!dept) return setFormErr('Vui lòng chọn hoặc nhập phòng ban');
+    if(!dept) return setFormErr('Vui lòng chọn hoặc nhập đơn vị');
     if(modal.mode==='add') {
       const dup = employees.find(e=>e.name.toLowerCase()===name.toLowerCase());
-      if(dup) return setFormErr('Nhân viên này đã tồn tại trong hệ thống');
+      if(dup) return setFormErr('Thí sinh này đã tồn tại trong hệ thống');
       setEmployees(p=>[...p, {id:Date.now(), name, dept}]);
     } else {
       const dup = employees.find(e=>e.name.toLowerCase()===name.toLowerCase() && e.id!==modal.emp.id);
-      if(dup) return setFormErr('Tên này đã được dùng cho nhân viên khác');
+      if(dup) return setFormErr('Tên này đã được dùng cho thí sinh khác');
       setEmployees(p=>p.map(e=>e.id===modal.emp.id?{...e,name,dept}:e));
     }
     closeModal();
@@ -660,7 +660,7 @@ const downloadTemplate = () => {
   ]);
   ws['!cols'] = [{wch:6},{wch:25},{wch:20}];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Nhân viên');
+  XLSX.utils.book_append_sheet(wb, ws, 'Thí sinh');
   XLSX.writeFile(wb, 'mau_import_nhan_vien.xlsx');
 };
   const [activeDept, setActiveDept] = useState('all');
@@ -694,7 +694,7 @@ const downloadTemplate = () => {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md w-full shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b">
-              <h2 className="font-bold text-slate-800">{modal.mode==='add'?'Thêm nhân viên mới':'Chỉnh sửa nhân viên'}</h2>
+              <h2 className="font-bold text-slate-800">{modal.mode==='add'?'Thêm thí sinh mới':'Chỉnh sửa thí sinh'}</h2>
               <button onClick={closeModal} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
             </div>
             <div className="p-5 space-y-4">
@@ -709,19 +709,19 @@ const downloadTemplate = () => {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">Phòng ban <span className="text-red-400">*</span></label>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">Đơn vị <span className="text-red-400">*</span></label>
                 <select
                   className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-500 mb-2"
                   value={form.dept}
                   onChange={e=>{ setForm(f=>({...f,dept:e.target.value})); setFormErr(''); }}
                 >
                   {depts.map(d=><option key={d} value={d}>{d}</option>)}
-                  <option value="__custom__">+ Tạo phòng ban mới...</option>
+                  <option value="__custom__">+ Tạo đơn vị mới...</option>
                 </select>
                 {form.dept==='__custom__' && (
                   <input
                     className="w-full border border-red-300 bg-red-50 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-500"
-                    placeholder="Nhập tên phòng ban mới"
+                    placeholder="Nhập tên đơn vị mới"
                     value={customDept}
                     onChange={e=>{ setCustomDept(e.target.value); setFormErr(''); }}
                   />
@@ -736,7 +736,7 @@ const downloadTemplate = () => {
               <div className="flex gap-2 pt-1">
                 <button onClick={closeModal} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
                 <button onClick={handleSave} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700">
-                  {modal.mode==='add'?'Thêm nhân viên':'Lưu thay đổi'}
+                  {modal.mode==='add'?'Thêm thí sinh':'Lưu thay đổi'}
                 </button>
               </div>
             </div>
@@ -751,14 +751,14 @@ const downloadTemplate = () => {
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Trash2 size={20} className="text-red-500"/>
             </div>
-            <h3 className="font-bold text-slate-800 text-center mb-1">Xóa nhân viên?</h3>
+            <h3 className="font-bold text-slate-800 text-center mb-1">Xóa thí sinh?</h3>
             <p className="text-sm text-slate-500 text-center mb-1">
               Bạn có chắc muốn xóa <span className="font-semibold text-slate-700">{modal.emp.name}</span>?
             </p>
-            <p className="text-xs text-red-400 text-center mb-5">Lịch sử thi của nhân viên này sẽ vẫn được giữ lại.</p>
+            <p className="text-xs text-red-400 text-center mb-5">Lịch sử thi của thí sinh này sẽ vẫn được giữ lại.</p>
             <div className="flex gap-2">
               <button onClick={closeModal} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
-              <button onClick={handleDelete} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600">Xóa nhân viên</button>
+              <button onClick={handleDelete} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600">Xóa thí sinh</button>
             </div>
           </div>
         </div>
@@ -767,13 +767,13 @@ const downloadTemplate = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center"><Users size={22} className="text-red-600"/></div>
-          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Nhân viên</h1><p className="text-slate-500 text-xs">{employees.length} nhân viên</p></div>
+          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Thí sinh</h1><p className="text-slate-500 text-xs">{employees.length} thí sinh</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50"><Download size={14}/>Tải file mẫu</button>
           <button onClick={()=>fileRef.current.click()} disabled={importing} className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-60"><Upload size={14}/>{importing?'Đang import...':'Import Excel'}</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport}/>
-          <button onClick={openAdd} className="flex items-center gap-1.5 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium"><Plus size={15}/>Thêm nhân viên</button>
+          <button onClick={openAdd} className="flex items-center gap-1.5 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium"><Plus size={15}/>Thêm thí sinh</button>
         </div>
       </div>
 
@@ -781,7 +781,7 @@ const downloadTemplate = () => {
         <div className={`mb-4 rounded-xl p-3 flex items-center gap-3 ${importResult.error?'bg-red-50 border border-red-200':'bg-emerald-50 border border-emerald-200'}`}>
           {importResult.error ? <AlertCircle size={15} className="text-red-500"/> : <CheckCircle size={15} className="text-emerald-600"/>}
           <p className={`text-sm flex-1 ${importResult.error?'text-red-700':'text-emerald-800 font-medium'}`}>
-            {importResult.error || `Thêm ${importResult.added} nhân viên thành công!`}
+            {importResult.error || `Thêm ${importResult.added} thí sinh thành công!`}
           </p>
           <button onClick={()=>setImportResult(null)} className="text-slate-400 hover:text-slate-600"><X size={14}/></button>
         </div>
@@ -790,7 +790,7 @@ const downloadTemplate = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          {ic:<Users size={18}/>, val:employees.length, lb:'Tổng nhân viên', col:'bg-red-100 text-red-600'},
+          {ic:<Users size={18}/>, val:employees.length, lb:'Tổng thí sinh', col:'bg-red-100 text-red-600'},
           {ic:<CheckCircle size={18}/>, val:<span>{totalPassed} <span className="text-xs font-normal text-slate-400">{passRate}%</span></span>, lb:'Đạt', col:'bg-emerald-100 text-emerald-600'},
           {ic:<TrendingUp size={18}/>, val:`${globalAvg}%`, lb:'Điểm TB chung', col:'bg-amber-100 text-amber-600'},
           {ic:<FileText size={18}/>, val:avgAttempts, lb:'Lượt thi TB', col:'bg-violet-100 text-violet-600'},
@@ -814,7 +814,7 @@ const downloadTemplate = () => {
         </div>
         <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-1.5 bg-white">
           <FileText size={13} className="text-slate-400"/>
-          <input className="text-sm outline-none w-44 text-slate-700 placeholder-slate-400" placeholder="Tìm kiếm nhân viên..." value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/>
+          <input className="text-sm outline-none w-44 text-slate-700 placeholder-slate-400" placeholder="Tìm kiếm thí sinh..." value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/>
         </div>
       </div>
 
@@ -823,7 +823,7 @@ const downloadTemplate = () => {
         <table className="w-full min-w-[640px]">
           <thead>
             <tr className="border-b border-slate-100">
-              {['Nhân viên','Lượt thi','Đạt','Điểm TB','Kết quả gần nhất','Thao tác'].map(h=>(
+              {['Thí sinh','Lượt thi','Đạt','Điểm TB','Kết quả gần nhất','Thao tác'].map(h=>(
                 <th key={h} className={`px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide ${h==='Kết quả gần nhất'||h==='Thao tác'?'text-center':'text-left'}`}>{h}</th>
               ))}
             </tr>
@@ -851,7 +851,7 @@ const downloadTemplate = () => {
                           </>
                         )}
                       </div>
-                      <span className="text-xs text-slate-400">{deptEmps.length} nhân viên</span>
+                      <span className="text-xs text-slate-400">{deptEmps.length} thí sinh</span>
                     </div>
                   </td>
                 </tr>,
@@ -898,13 +898,13 @@ const downloadTemplate = () => {
         {filtered.length===0 && (
           <div className="text-center py-16 text-slate-400">
             <Users size={36} className="mx-auto mb-3 opacity-20"/>
-            <p className="text-sm">Không tìm thấy nhân viên nào</p>
+            <p className="text-sm">Không tìm thấy thí sinh nào</p>
           </div>
         )}
 
         {totalPages>1 && (
           <div className="flex items-center justify-center gap-2 py-4 border-t border-slate-100">
-            <span className="text-xs text-slate-500 mr-2">Hiển thị {filtered.length} nhân viên</span>
+            <span className="text-xs text-slate-500 mr-2">Hiển thị {filtered.length} thí sinh</span>
             <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-300 disabled:opacity-40">‹</button>
             {Array.from({length:totalPages},(_,i)=>i+1).map(p=>(
               <button key={p} onClick={()=>setPage(p)} className={`w-7 h-7 rounded-lg text-xs font-medium ${p===page?'bg-red-600 text-white':'border border-slate-200 text-slate-500 hover:border-red-300'}`}>{p}</button>
@@ -951,20 +951,20 @@ const Reports = ({results, exams, employees}) => {
   const exportExcel = () => {
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Tổng hợp phòng ban
+    // Sheet 1: Tổng hợp phòng  ban
     const s1 = XLSX.utils.aoa_to_sheet([
-      ['BÁO CÁO KẾT QUẢ THI - BỆNH VIỆN QUÂN Y 4'],
+      ['BÁO CÁO KẾT QUẢ THI - Cục hậu cần - kỹ thuật Quân khu 4'],
       ['Xuất ngày: ' + new Date().toLocaleDateString('vi-VN')],
       [],
-      ['Phòng ban','Lượt thi','Số đạt','Số chưa đạt','Điểm TB (%)','Tỉ lệ đạt (%)'],
+      ['Đơn vị','Lượt thi','Số đạt','Số chưa đạt','Điểm TB (%)','Tỉ lệ đạt (%)'],
       ...deptData.map(d=>[d.name, d.attempts, d.passed, d.failed, d.avg, d.rate]),
     ]);
     s1['!cols']=[{wch:22},{wch:12},{wch:12},{wch:16},{wch:14},{wch:14}];
     s1['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}}];
-    XLSX.utils.book_append_sheet(wb, s1, 'Tổng hợp phòng ban');
+    XLSX.utils.book_append_sheet(wb, s1, 'Tổng hợp đơn vị');
 
     // Sheet 2: Chi tiết kết quả
-    const s2rows = [['Họ và tên','Phòng ban','Đề thi','Điểm (%)','Số câu đúng','Tổng câu','Kết quả','Điểm đạt yêu cầu (%)','Thời gian làm bài','Ngày thi']];
+    const s2rows = [['Họ và tên','Đơn vị','Đề thi','Điểm (%)','Số câu đúng','Tổng câu','Kết quả','Điểm đạt yêu cầu (%)','Thời gian làm bài','Ngày thi']];
     results.forEach(r=>{
       const emp = employees.find(e=>e.id===r.empId);
       const exam = exams.find(e=>e.id===r.examId);
@@ -978,8 +978,8 @@ const Reports = ({results, exams, employees}) => {
     s2['!cols']=[{wch:22},{wch:18},{wch:30},{wch:12},{wch:14},{wch:12},{wch:14},{wch:20},{wch:18},{wch:14}];
     XLSX.utils.book_append_sheet(wb, s2, 'Chi tiết kết quả');
 
-    // Sheet 3: Danh sách nhân viên
-    const s3rows = [['Họ và tên','Phòng ban','Tổng lượt thi','Số bài đạt','Số bài chưa đạt','Điểm TB (%)','Kết quả gần nhất','Ngày thi gần nhất','Trạng thái']];
+    // Sheet 3: Danh sách thí sinh
+    const s3rows = [['Họ và tên','Đơn vị','Tổng lượt thi','Số bài đạt','Số bài chưa đạt','Điểm TB (%)','Kết quả gần nhất','Ngày thi gần nhất','Trạng thái']];
     employees.forEach(emp=>{
       const rs = results.filter(r=>r.empId===emp.id);
       const passed = rs.filter(r=>{const e=exams.find(x=>x.id===r.examId);return e&&r.score>=e.pass;}).length;
@@ -991,7 +991,7 @@ const Reports = ({results, exams, employees}) => {
     });
     const s3 = XLSX.utils.aoa_to_sheet(s3rows);
     s3['!cols']=[{wch:22},{wch:18},{wch:16},{wch:14},{wch:18},{wch:14},{wch:18},{wch:18},{wch:14}];
-    XLSX.utils.book_append_sheet(wb, s3, 'Danh sách nhân viên');
+    XLSX.utils.book_append_sheet(wb, s3, 'Danh sách thí sinh');
 
     XLSX.writeFile(wb, `BaoCao_BenhVienQuanY4_${new Date().toLocaleDateString('vi-VN').replace(/\//g,'-')}.xlsx`);
   };
@@ -1004,7 +1004,7 @@ const Reports = ({results, exams, employees}) => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center"><TrendingUp size={20} className="text-red-600"/></div>
-          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Báo cáo & Phân tích</h1><p className="text-slate-500 text-xs">Phân tích kết quả thi theo phòng ban</p></div>
+          <div><h1 className="text-lg md:text-xl font-bold text-slate-800">Báo cáo & Phân tích</h1><p className="text-slate-500 text-xs">Phân tích kết quả thi theo đơn vị</p></div>
         </div>
         <button onClick={exportExcel} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium">
           <Download size={15}/>Xuất Excel <ChevronRight size={14} className="rotate-90"/>
@@ -1014,10 +1014,10 @@ const Reports = ({results, exams, employees}) => {
       {/* Stat cards with sparklines */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          {ic:<BarChart2 size={18}/>, val:depts.length, lb:'Phòng ban', sub:'Đã có dữ liệu', icCol:'bg-red-100 text-red-600', spark:'#fca5a5', path:'M0,20 C10,15 20,25 30,18 C40,10 50,22 60,16 C70,10 80,20 90,14'},
+          {ic:<BarChart2 size={18}/>, val:depts.length, lb:'Đơn vị', sub:'Đã có dữ liệu', icCol:'bg-red-100 text-red-600', spark:'#fca5a5', path:'M0,20 C10,15 20,25 30,18 C40,10 50,22 60,16 C70,10 80,20 90,14'},
           {ic:<CheckCircle size={18}/>, val:totalAttempts, lb:'Tổng lượt thi', sub:'Trong kỳ', icCol:'bg-emerald-100 text-emerald-600', spark:'#6ee7b7', path:'M0,22 C15,18 25,24 40,16 C55,8 65,20 80,14 C85,12 88,16 90,13'},
           {ic:<TrendingUp size={18}/>, val:`${globalAvg}%`, lb:'Điểm TB chung', sub:'Toàn hệ thống', icCol:'bg-amber-100 text-amber-600', spark:'#fcd34d', path:'M0,24 C10,20 20,22 35,14 C50,6 60,18 75,12 C82,9 87,15 90,10'},
-          {ic:<Award size={18}/>, val:`${bestDept.avg}%`, lb:'Phòng ban cao nhất', sub:bestDept.name, icCol:'bg-violet-100 text-violet-600', spark:'#c4b5fd', path:'M0,20 C12,16 22,22 38,12 C54,2 62,18 78,10 C84,7 88,13 90,8'},
+          {ic:<Award size={18}/>, val:`${bestDept.avg}%`, lb:'Đơn vị cao nhất', sub:bestDept.name, icCol:'bg-violet-100 text-violet-600', spark:'#c4b5fd', path:'M0,20 C12,16 22,22 38,12 C54,2 62,18 78,10 C84,7 88,13 90,8'},
         ].map((s,i)=>(
           <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 overflow-hidden relative">
             <div className="flex items-start gap-3 mb-3">
@@ -1041,7 +1041,7 @@ const Reports = ({results, exams, employees}) => {
         <div className="md:lg:col-span-3 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-slate-700">So sánh điểm trung bình theo phòng ban</h3>
+              <h3 className="text-sm font-semibold text-slate-700">So sánh điểm trung bình của các đơn vị</h3>
               <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center cursor-help" title="Điểm trung bình của tất cả lần thi trong kỳ">
                 <span className="text-xs text-slate-400 font-bold">i</span>
               </div>
@@ -1110,12 +1110,12 @@ const Reports = ({results, exams, employees}) => {
       {/* Detail table */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-5">
         <div className="px-5 py-4 border-b border-slate-100">
-          <h3 className="text-sm font-semibold text-slate-700">Chi tiết kết quả theo phòng ban</h3>
+          <h3 className="text-sm font-semibold text-slate-700">Chi tiết kết quả theo đơn vị</h3>
         </div>
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/50">
-              {['Phòng ban','Lượt thi','Đạt','Chưa đạt','Điểm TB','Tiến độ đạt','Xu hướng'].map(h=>(
+              {['Đơn vị','Lượt thi','Đạt','Chưa đạt','Điểm TB','Tiến độ đạt','Xu hướng'].map(h=>(
                 <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -1172,7 +1172,7 @@ const Reports = ({results, exams, employees}) => {
         <div className="flex-1">
           <div className="font-semibold text-blue-700 mb-1 text-sm">Nhận xét tổng quan</div>
           <p className="text-sm text-slate-600">
-            Phòng ban <strong>{bestDept.name}</strong> đang có kết quả tốt nhất với {bestDept.avg}% điểm trung bình.
+            Đơn vị <strong>{bestDept.name}</strong> đang có kết quả tốt nhất với {bestDept.avg}% điểm trung bình.
             {worstDept&&worstDept.name!==bestDept.name&&<> <strong>{worstDept.name}</strong> cần cải thiện thêm để nâng cao chất lượng kết quả.</>}
           </p>
         </div>
@@ -1451,7 +1451,7 @@ const Login = ({onLogin, employees}) => {
       <div className="w-full max-w-sm sm:max-w-sm">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-600/25"><Shield size={28} className="text-white"/></div>
-          <h1 className="text-2xl font-bold text-white">Bệnh viện Quân y 4</h1>
+          <h1 className="text-2xl font-bold text-white">Cục hậu cần - kỹ thuật Quân khu 4</h1>
           <p className="text-slate-400 mt-1 text-sm">Hệ thống thi trắc nghiệm nội bộ</p>
         </div>
 
@@ -1461,7 +1461,7 @@ const Login = ({onLogin, employees}) => {
             <p className="text-slate-400 text-xs text-center mb-4">Chọn vai trò của bạn để đăng nhập</p>
             {[
               {key:'admin', em:'👔', tt:'Quản trị viên', sub:'Quản lý câu hỏi, đề thi & báo cáo', to:'admin'},
-              {key:'emp',   em:'👤', tt:'Nhân viên',     sub:'Tham gia thi và xem kết quả',          to:'dept'},
+              {key:'emp',   em:'👤', tt:'Thí sinh',     sub:'Tham gia thi và xem kết quả',          to:'dept'},
             ].map(item=>(
               <button key={item.key} onClick={()=>setStep(item.to)} className="w-full bg-white/8 hover:bg-white/15 border border-white/15 text-white p-4 rounded-xl text-left transition-all group">
                 <div className="flex items-center gap-3">
@@ -1517,18 +1517,18 @@ const Login = ({onLogin, employees}) => {
           </div>
         )}
 
-        {/* STEP 2B: Chọn phòng ban */}
+        {/* STEP 2B: Chọn đơn vị */}
         {step==='dept' && (
           <div>
             <button onClick={()=>back('role')} className="text-slate-400 hover:text-white text-xs mb-4 flex items-center gap-1">← Quay lại</button>
-            <p className="text-slate-400 text-xs text-center mb-4">Chọn phòng ban của bạn</p>
+            <p className="text-slate-400 text-xs text-center mb-4">Chọn đơn vị</p>
             <div className="space-y-2">
               {depts.map(dept=>{
                 const count = employees.filter(e=>e.dept===dept).length;
                 return (
                   <button key={dept} onClick={()=>{setSelectedDept(dept);setStep('employee');}} className="w-full bg-white/8 hover:bg-white/15 border border-white/15 text-white p-4 rounded-xl text-left transition-all group flex items-center gap-3">
                     <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center text-base">🏢</div>
-                    <div className="flex-1"><div className="font-medium text-sm">{dept}</div><div className="text-slate-400 text-xs">{count} nhân viên</div></div>
+                    <div className="flex-1"><div className="font-medium text-sm">{dept}</div><div className="text-slate-400 text-xs">{count} thí sinh</div></div>
                     <ChevronRight size={15} className="text-slate-500 group-hover:text-white transition-colors"/>
                   </button>
                 );
@@ -1537,12 +1537,12 @@ const Login = ({onLogin, employees}) => {
           </div>
         )}
 
-        {/* STEP 3: Chọn nhân viên */}
+        {/* STEP 3: Chọn thí sinh */}
         {step==='employee' && (
           <div>
             <button onClick={()=>setStep('dept')} className="text-slate-400 hover:text-white text-xs mb-4 flex items-center gap-1">← Quay lại</button>
             <div className="flex items-center gap-2 mb-4 px-1">
-              <span className="text-slate-400 text-xs">Phòng ban:</span>
+              <span className="text-slate-400 text-xs">Đơn vị:</span>
               <span className="bg-red-600/20 text-red-300 text-xs px-2.5 py-1 rounded-full font-medium">{selectedDept}</span>
             </div>
             <p className="text-slate-400 text-xs text-center mb-3">Chọn tên của bạn</p>
@@ -1554,7 +1554,7 @@ const Login = ({onLogin, employees}) => {
                   <ChevronRight size={15} className="text-slate-500 ml-auto"/>
                 </button>
               ))}
-              {deptEmployees.length===0 && <p className="text-center text-slate-500 text-sm py-4">Không có nhân viên trong phòng ban này</p>}
+              {deptEmployees.length===0 && <p className="text-center text-slate-500 text-sm py-4">Không có thí sinh trong đơn vị này</p>}
             </div>
           </div>
         )}
@@ -1578,7 +1578,7 @@ const ExamResults = ({results, exams, employees, onClearAll}) => {
           <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0"><AlertCircle size={18} className="text-red-600"/></div>
           <h2 className="font-bold text-slate-800">Xóa tất cả kết quả thi?</h2>
         </div>
-        <p className="text-sm text-slate-600 mb-4">Toàn bộ <span className="font-semibold text-red-600">{results.length} lượt thi</span> của tất cả đề thi sẽ bị xóa vĩnh viễn và <span className="font-semibold">không thể khôi phục</span>. Câu hỏi, đề thi và nhân viên không bị ảnh hưởng.</p>
+        <p className="text-sm text-slate-600 mb-4">Toàn bộ <span className="font-semibold text-red-600">{results.length} lượt thi</span> của tất cả đề thi sẽ bị xóa vĩnh viễn và <span className="font-semibold">không thể khôi phục</span>. Câu hỏi, đề thi và thí sinh không bị ảnh hưởng.</p>
         <div className="flex gap-2">
           <button onClick={()=>setConfirmClear(false)} className="flex-1 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
           <button onClick={()=>{onClearAll&&onClearAll(); setConfirmClear(false); setSelId(null);}} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Xóa tất cả</button>
@@ -1627,7 +1627,7 @@ const ExamResults = ({results, exams, employees, onClearAll}) => {
   const rows = results.filter(r=>r.examId===selId).sort((a,b)=>b.id-a.id);
 
   const exportExcel = () => {
-    const head = ['Họ và tên','Phòng ban','Điểm (%)','Số câu đúng','Tổng câu','Kết quả','Thời gian làm bài','Ngày thi'];
+    const head = ['Họ và tên','Đơn vị','Điểm (%)','Số câu đúng','Tổng câu','Kết quả','Thời gian làm bài','Ngày thi'];
     const body = rows.map(r=>{
       const emp = employees.find(e=>e.id===r.empId);
       const ok = exam && r.score >= exam.pass;
@@ -1665,7 +1665,7 @@ const ExamResults = ({results, exams, employees, onClearAll}) => {
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
           <table className="w-full min-w-[640px]">
-            <thead><tr className="bg-slate-50">{['Nhân viên','Phòng ban','Điểm','Số câu đúng','Kết quả','Thời gian','Ngày thi'].map(h=><th key={h} className={`px-3 py-2 text-xs font-medium text-slate-400 uppercase ${h==='Kết quả'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
+            <thead><tr className="bg-slate-50">{['Thí sinh','Đơn vị','Điểm','Số câu đúng','Kết quả','Thời gian','Ngày thi'].map(h=><th key={h} className={`px-3 py-2 text-xs font-medium text-slate-400 uppercase ${h==='Kết quả'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
             <tbody>
               {rows.map(r=>{
                 const emp=employees.find(e=>e.id===r.empId);

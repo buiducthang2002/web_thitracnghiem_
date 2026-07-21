@@ -107,7 +107,7 @@ git push -u origin main
 4. Nhấn **Deploy** → chờ 1-2 phút
 
 5. Vercel sẽ cấp cho bạn link dạng: `https://bvqy4-quiz.vercel.app`  
-   → Chia sẻ link này cho nhân viên là xong! 🎉
+   → Chia sẻ link này cho thí sinh là xong! 🎉
 
 ---
 
@@ -118,7 +118,7 @@ Sau khi deploy xong, đăng nhập bằng tài khoản Admin:
 - **Mật khẩu:** `123`
 
 Vào các mục để thêm:
-- **Nhân viên** → Thêm thủ công hoặc Import Excel
+- **Thí sinh** → Thêm thủ công hoặc Import Excel
 - **Câu hỏi** → Thêm thủ công hoặc Import Word
 - **Đề thi** → Tạo đề thi từ ngân hàng câu hỏi
 

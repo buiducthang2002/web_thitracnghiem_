@@ -43,7 +43,7 @@ const EMPLOYEES = [
 const QUESTIONS = [
   {id:1,topic:"An toàn lao động",level:"TB",text:"Khi phát hiện sự cố về điện, việc đầu tiên cần làm là?",opts:["Tự sửa chữa","Ngắt nguồn và báo kỹ thuật","Bỏ qua nếu nhỏ","Chờ sự cố tự hết"],ans:1},
   {id:2,topic:"An toàn lao động",level:"Dễ",text:"Lối thoát hiểm trong trường hợp khẩn cấp phải như thế nào?",opts:["Khóa để bảo mật","Luôn thông thoáng, không bị chặn","Chỉ mở khi có sự cố","Để vật dụng tạm thời"],ans:1},
-  {id:3,topic:"An toàn lao động",level:"Dễ",text:"Khi xảy ra hỏa hoạn trong tòa nhà, nhân viên phải?",opts:["Dùng thang máy cho nhanh","Dùng cầu thang bộ, không dùng thang máy","Chờ hỏa hoạn tắt","Gọi điện hỏi ý kiến"],ans:1},
+  {id:3,topic:"An toàn lao động",level:"Dễ",text:"Khi xảy ra hỏa hoạn trong tòa nhà, thí sinh phải?",opts:["Dùng thang máy cho nhanh","Dùng cầu thang bộ, không dùng thang máy","Chờ hỏa hoạn tắt","Gọi điện hỏi ý kiến"],ans:1},
   {id:4,topic:"An toàn lao động",level:"TB",text:"Bình chữa cháy cần được kiểm tra định kỳ bao lâu một lần?",opts:["1 năm/lần","3 năm/lần","Khi nào hỏng thì kiểm tra","5 năm/lần"],ans:0},
   {id:5,topic:"An toàn lao động",level:"Khó",text:"Khi đồng nghiệp bị ngã, bất tỉnh, cần làm gì đầu tiên?",opts:["Tự xử lý","Lay mạnh để người đó tỉnh","Gọi cấp cứu và sơ cứu an toàn","Bỏ qua nếu còn thở"],ans:2},
 ];
