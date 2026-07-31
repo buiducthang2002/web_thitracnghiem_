@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, XCircle, Award, Home, Play, TrendingUp, TrendingDown, X, ChevronRight, Shield, ShieldCheck, Star, ArrowRight, ArrowLeft, Upload, Download, AlertCircle, Info, FileSearch, PieChart as PieChartIcon } from "lucide-react";
-import { db } from "./firebase";
+import { db, missingConfig, projectId } from "./firebase";
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
 const COL = { employees:'employees', questions:'questions', exams:'exams', results:'results' };
@@ -1898,6 +1898,14 @@ export default function App() {
   const [activeExam, setActiveExam] = useState(null);
   const [lastResult, setLastResult] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dbError, setDbError] = useState(missingConfig.length
+    ? `Thiếu cấu hình Firebase (${missingConfig.join(', ')}). Kiểm tra file .env rồi chạy/build lại — dữ liệu sẽ KHÔNG được lưu.`
+    : null);
+  const [saving, setSaving] = useState(0);   // số lệnh ghi đang chờ máy chủ xác nhận
+
+  // Bản sao mới nhất của từng collection, dùng để tính diff khi ghi (không đọc từ
+  // state trong updater — xem makeSyncSetter).
+  const dataRef = useRef({ employees: [], questions: [], exams: [], results: [] });
 
   // ── Realtime sync từ Firebase ──
   useEffect(() => {
@@ -1906,10 +1914,20 @@ export default function App() {
     const TOTAL = 4;
     const sub = (colName, setter) => {
       let first = true;
-      const unsub = onSnapshot(collection(db, colName), snap => {
-        setter(snap.docs.map(d => ({ ...d.data(), id: d.data().id || d.id })));
-        if (first) { first = false; loadCount++; if (loadCount >= TOTAL) setLoading(false); }
-      });
+      const unsub = onSnapshot(collection(db, colName),
+        snap => {
+          const list = snap.docs.map(d => ({ ...d.data(), id: d.data().id || d.id }));
+          dataRef.current[colName] = list;
+          setter(list);
+          if (first) { first = false; loadCount++; if (loadCount >= TOTAL) setLoading(false); }
+        },
+        err => {
+          // Không có callback này thì listener chết âm thầm: màn hình đứng ở "Đang tải"
+          // hoặc hiện dữ liệu cũ trong cache mà không ai biết là đã mất kết nối.
+          console.error(`[Firestore] Lỗi đọc "${colName}":`, err);
+          setDbError(`Không đọc được dữ liệu "${colName}" từ máy chủ (${err.code || err.message}).`);
+          setLoading(false);
+        });
       unsubs.push(unsub);
     };
     sub(COL.employees, setEmployees);
@@ -1920,19 +1938,45 @@ export default function App() {
   }, []);
 
   // ── Firebase write helpers ──
-  const fbSet = (colName, item) => setDoc(doc(db, colName, String(item.id)), item);
-  const fbDel = (colName, id)  => deleteDoc(doc(db, colName, String(id)));
+  // Firestore từ chối giá trị undefined và không nhận mảng lồng mảng → dọn trước khi ghi.
+  const clean = obj => JSON.parse(JSON.stringify(obj));
 
+  const onWriteError = (what, colName, err) => {
+    console.error(`[Firestore] ${what} "${colName}" thất bại:`, err);
+    setDbError(`Lưu lên máy chủ thất bại (${colName}: ${err.code || err.message}). Dữ liệu vừa thao tác CHƯA được lưu — kiểm tra mạng rồi làm lại.`);
+  };
+
+  const track = p => {
+    setSaving(n => n + 1);
+    return p.finally(() => setSaving(n => Math.max(0, n - 1)));
+  };
+
+  const fbSet = (colName, item) => {
+    try {
+      return track(setDoc(doc(db, colName, String(item.id)), clean(item)))
+        .catch(err => { onWriteError('Ghi', colName, err); throw err; });
+    } catch (err) {                       // setDoc ném đồng bộ khi dữ liệu sai kiểu
+      onWriteError('Ghi', colName, err);
+      return Promise.reject(err);
+    }
+  };
+
+  const fbDel = (colName, id) =>
+    track(deleteDoc(doc(db, colName, String(id))))
+      .catch(err => { onWriteError('Xóa', colName, err); throw err; });
+
+  // Side effect (ghi/xóa Firestore) phải nằm NGOÀI updater của setState: React
+  // StrictMode và concurrent render gọi updater nhiều lần → sẽ ghi/xóa lặp.
   const makeSyncSetter = (colName, localSetter) => (updater) => {
-    localSetter(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      next.forEach(item => {
-        const old = prev.find(e => e.id === item.id);
-        if (!old || JSON.stringify(old) !== JSON.stringify(item)) fbSet(colName, item);
-      });
-      prev.forEach(item => { if (!next.find(e => e.id === item.id)) fbDel(colName, item.id); });
-      return next;
+    const prev = dataRef.current[colName];
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    dataRef.current[colName] = next;
+    localSetter(next);
+    next.forEach(item => {
+      const old = prev.find(e => e.id === item.id);
+      if (!old || JSON.stringify(old) !== JSON.stringify(item)) fbSet(colName, item).catch(()=>{});
     });
+    prev.forEach(item => { if (!next.find(e => e.id === item.id)) fbDel(colName, item.id).catch(()=>{}); });
   };
 
   const setEmployeesSync = makeSyncSetter(COL.employees, setEmployees);
@@ -1944,13 +1988,28 @@ export default function App() {
   const logout    = () => { setUser(null); setActiveExam(null); setLastResult(null); };
   const startExam = exam => { setActiveExam(exam); setLastResult(null); };
   const finishExam = async r => {
-    await fbSet(COL.results, r);
+    // Ghi hỏng thì vẫn cho thí sinh xem kết quả (banner đỏ sẽ báo chưa lưu được),
+    // không để kẹt lại ở màn hình làm bài.
+    try { await fbSet(COL.results, r); } catch { /* onWriteError đã hiện banner */ }
     setLastResult(r);
     setActiveExam(null);
   };
 
+  const banner = dbError && (
+    <div className="fixed top-0 inset-x-0 z-[100] bg-red-600 text-white text-xs sm:text-sm px-4 py-2.5 flex items-start gap-2 shadow-lg">
+      <AlertCircle size={16} className="flex-shrink-0 mt-0.5"/>
+      <div className="flex-1">
+        <p className="font-semibold">Mất kết nối cơ sở dữ liệu</p>
+        <p className="opacity-90 break-words">{dbError}</p>
+        <p className="opacity-70 mt-0.5">Project: {projectId || '(chưa cấu hình)'}</p>
+      </div>
+      <button onClick={()=>setDbError(null)} className="flex-shrink-0 opacity-80 hover:opacity-100"><X size={16}/></button>
+    </div>
+  );
+
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      {banner}
       <div className="text-center">
         <div className="flex justify-center mb-3 animate-pulse"><Emblem size={96}/></div>
         <p className="text-slate-500 text-sm">Đang tải dữ liệu...</p>
@@ -1958,11 +2017,11 @@ export default function App() {
     </div>
   );
 
-  if (!user) return <Login onLogin={login} employees={employees}/>;
-  if (activeExam) return <ExamScreen user={user} exam={activeExam} questions={questions} onFinish={finishExam}/>;
+  if (!user) return <>{banner}<Login onLogin={login} employees={employees}/></>;
+  if (activeExam) return <>{banner}<ExamScreen user={user} exam={activeExam} questions={questions} onFinish={finishExam}/></>;
   if (lastResult) {
     const exam = exams.find(e=>e.id===lastResult.examId);
-    return <ResultScreen result={lastResult} exam={exam} questions={questions} onBack={()=>{setLastResult(null);setView("home");}}/>;
+    return <>{banner}<ResultScreen result={lastResult} exam={exam} questions={questions} onBack={()=>{setLastResult(null);setView("home");}}/></>;
   }
 
   const adminViews = {
@@ -1979,10 +2038,16 @@ export default function App() {
 
   return (
     <div className="flex bg-slate-50 min-h-screen">
+      {banner}
       <Sidebar role={user.role} active={view} setActive={setView} user={user} onLogout={logout} rail={rail} setRail={setRail}/>
       <div className={`flex-1 ${rail?'md:ml-[78px]':'md:ml-[168px]'} overflow-auto pt-14 md:pt-0 pb-16 md:pb-0 transition-[margin] duration-200`}>
         <div className="p-3 sm:p-4 md:p-7">{user.role==="admin"?adminViews[view]:empViews[view]}</div>
       </div>
+      {saving > 0 && (
+        <div className="fixed bottom-20 md:bottom-5 right-4 z-[90] bg-slate-800 text-white text-xs px-3 py-2 rounded-lg shadow-lg flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"/>Đang lưu lên máy chủ...
+        </div>
+      )}
     </div>
   );
 }
