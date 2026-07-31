@@ -103,7 +103,7 @@ const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
         <div className="flex items-center gap-2 flex-shrink-0">
           <Emblem size={34}/>
           <div>
-            <div className="text-[#0B4F32] font-bold text-[10px] leading-tight whitespace-nowrap">Cục hậu cần - kỹ thuật Quân khu 4</div>
+            <div className="text-[#0B4F32] font-bold text-[10px] leading-tight whitespace-nowrap"> Quân khu 4</div>
             <div className="text-slate-400 text-[9px] whitespace-nowrap">Hệ thống thi trắc nghiệm</div>
           </div>
         </div>
@@ -1005,7 +1005,7 @@ const Reports = ({results, exams, employees}) => {
 
     // Sheet 1: Tổng hợp phòng  ban
     const s1 = XLSX.utils.aoa_to_sheet([
-      ['BÁO CÁO KẾT QUẢ THI - Cục hậu cần - kỹ thuật Quân khu 4'],
+      ['BÁO CÁO KẾT QUẢ THI - Quân khu 4'],
       ['Xuất ngày: ' + new Date().toLocaleDateString('vi-VN')],
       [],
       ['Đơn vị','Lượt thi','Số đạt','Số chưa đạt','Điểm TB (%)','Tỉ lệ đạt (%)'],
@@ -1053,7 +1053,6 @@ const Reports = ({results, exams, employees}) => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center"><BarChart2 size={22} className="text-emerald-600"/></div>
           <div><h1 className="text-xl md:text-2xl font-bold text-slate-800">Báo cáo & Phân tích</h1><p className="text-slate-500 text-xs md:text-sm">Phân tích kết quả thi theo đơn vị</p></div>
         </div>
         <button onClick={exportExcel} className="flex items-center gap-2 bg-gradient-to-r from-[#0B4F32] to-emerald-600 hover:from-[#0a4429] hover:to-emerald-700 text-white px-5 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-emerald-900/20 transition-all">
@@ -1064,24 +1063,23 @@ const Reports = ({results, exams, employees}) => {
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
-          {ic:<BarChart2 size={18}/>, val:depts.length, lb:'Đơn vị', sub:'Đã có dữ liệu',
-           icCol:'bg-teal-100 text-teal-600', valCol:'text-teal-600', footBg:'bg-teal-50',
+          {val:depts.length, lb:'Đơn vị', sub:'Đã có dữ liệu',
+           valCol:'text-teal-600', footBg:'bg-teal-50',
            trend:pctChange(deptCountOf(rsThis), deptCountOf(rsPrev))},
-          {ic:<CheckCircle size={18}/>, val:totalAttempts, lb:'Tổng lượt thi', sub:'Trong kỳ',
-           icCol:'bg-emerald-100 text-emerald-600', valCol:'text-emerald-600', footBg:'bg-emerald-50',
+          {val:totalAttempts, lb:'Tổng lượt thi', sub:'Trong kỳ',
+           valCol:'text-emerald-600', footBg:'bg-emerald-50',
            trend:pctChange(rsThis.length, rsPrev.length)},
-          {ic:<TrendingUp size={18}/>, val:`${globalAvg}%`, lb:'Điểm TB chung', sub:'Toàn hệ thống',
-           icCol:'bg-amber-100 text-amber-600', valCol:'text-amber-500', footBg:'bg-amber-50',
+          {val:`${globalAvg}%`, lb:'Điểm TB chung', sub:'Toàn hệ thống',
+           valCol:'text-amber-500', footBg:'bg-amber-50',
            trend:pctChange(avgOf(rsThis), avgOf(rsPrev))},
-          {ic:<Award size={18}/>, val:`${bestDept.avg}%`, lb:'Đơn vị cao nhất', sub:bestDept.name,
-           icCol:'bg-violet-100 text-violet-600', valCol:'text-violet-600', footBg:'bg-violet-50',
+          {val:`${bestDept.avg}%`, lb:'Đơn vị cao nhất', sub:bestDept.name,
+           valCol:'text-violet-600', footBg:'bg-violet-50',
            trend:pctChange(bestAvgOf(rsThis), bestAvgOf(rsPrev))},
         ].map((s,i)=>{
           const down = s.trend < 0;
           return (
             <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
               <div className="flex items-start gap-3">
-                <div className={`w-11 h-11 ${s.icCol} rounded-2xl flex items-center justify-center flex-shrink-0`}>{s.ic}</div>
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className={`text-2xl font-bold ${s.valCol} leading-tight flex-shrink-0`}>{s.val}</span>
@@ -1631,7 +1629,7 @@ const Login = ({onLogin, employees}) => {
         {/* HEADER */}
         <div className="text-center">
           <div className="flex justify-center"><Emblem size={128}/></div>
-          <h1 className="mt-3 text-xl sm:text-3xl font-bold text-[#0B4F32] tracking-tight">Cục hậu cần - kỹ thuật Quân khu 4</h1>
+          <h1 className="mt-3 text-xl sm:text-3xl font-bold text-[#0B4F32] tracking-tight">Quân khu 4</h1>
           <p className="mt-1.5 text-slate-600 text-sm">Hệ thống thi trắc nghiệm nội bộ</p>
           <StarDivider/>
         </div>
