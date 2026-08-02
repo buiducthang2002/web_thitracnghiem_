@@ -8,6 +8,12 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firesto
 
 const COL = { employees:'employees', questions:'questions', exams:'exams', results:'results' };
 
+// Nhãn phương án trả lời. Firestore rules cho phép 2–10 phương án mỗi câu.
+const OPT_LETTERS = 'ABCDEFGHIJ';
+const MAX_OPTS = OPT_LETTERS.length;
+// Ký tự đánh dấu chỗ in đậm/gạch chân khi đọc file Word (không xuất hiện trong văn bản thật).
+const BOLD = '\u0001';
+
 const EMPLOYEES_INIT = [];
 const QUESTIONS_INIT = [];
 const EXAMS_INIT = [];
@@ -247,80 +253,142 @@ const Questions = ({questions, setQuestions}) => {
     setCustomTopic('');
   };
 
-  // Parse text extracted from Word doc
-  const parseWordText = (text) => {
-    const parsed = [];
-    let skipped = 0;
-    let norm = text.replace(/\r\n?/g, '\n');
-    // Detach an option marker glued right after sentence punctuation ("...?A. xxx")
-    norm = norm.replace(/([?”’"):.])(?=[A-Da-d]\s*[\.\)]\s)/g, '$1\n');
-    // Split into blocks at each "Câu N" marker
-    const blocks = norm.split(/\n(?=\s*Câu\s*\d+\s*[\.\:\)])/i).filter(b=>b.trim());
-    // Word often lays options out in a table / 2-column grid, so mammoth puts two
-    // options on one line ("A. xxx  B. yyy"). Split every line at each inline
-    // option marker or meta marker so each option/meta lands on its own line.
-    const splitRe = /\s+(?=(?:[A-Da-d]\s*[\.\)]\s)|(?:Đáp\s*án(?:\s*đúng)?|ĐA|Chủ\s*đề|Mức\s*độ)\s*[:\.\-])/i;
-    for(const block of blocks) {
-      const lines = [];
-      for(const raw of block.split('\n')) {
-        const t = raw.trim();
-        if(!t) continue;
-        t.split(splitRe).forEach(s=>{ const x=s.trim(); if(x) lines.push(x); });
-      }
-      if(lines.length < 2) { skipped++; continue; }
+  // ── Đọc câu hỏi từ file Word ────────────────────────────────────────────
+  // Nguyên tắc: tìm thấy bao nhiêu mốc "Câu N" trong file thì phải nhập ra đúng
+  // bấy nhiêu câu, không bỏ sót câu nào. Câu nào thiếu thông tin (không có dòng
+  // "Đáp án", thiếu phương án...) vẫn được nhập và gắn cờ needsReview để sửa tay,
+  // thay vì bị loại âm thầm như trước.
 
-      let ansIdx = -1;
-      let topic = 'Nội quy';
-      let level = 'Dễ';
-      // Question text = first line with the "Câu N:" prefix stripped
-      const qText = lines[0].replace(/^\s*Câu\s*\d+\s*[\.\:\)]\s*/i,'').trim();
-      // Collect candidate option lines (everything after the question that isn't meta)
-      const cand = [];
-      for(let i=1;i<lines.length;i++){
-        const l = lines[i];
-        const ansMatch = l.match(/^(?:Đáp\s*án(?:\s*đúng)?|ĐA)\s*[:\.\-]\s*([A-Da-d])/i);
-        if(ansMatch){ ansIdx = 'abcd'.indexOf(ansMatch[1].toLowerCase()); continue; }
-        const topicMatch = l.match(/^Chủ\s*đề\s*[:\.\-]\s*(.+)/i);
-        if(topicMatch){ topic = topicMatch[1].trim(); continue; }
-        const lvlMatch = l.match(/^Mức\s*độ\s*[:\.\-]\s*(.+)/i);
-        if(lvlMatch){ level = lvlMatch[1].trim(); continue; }
-        cand.push(l);
+  // mammoth.extractRawText làm mất định dạng, mà rất nhiều file lại đánh dấu đáp án
+  // đúng bằng cách bôi đậm / gạch chân. Đọc thêm bản HTML rồi giữ lại dấu đó.
+  const htmlToMarkedText = html => html
+    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n')
+    .replace(/<\/t[dh]>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(strong|u)\b[^>]*>/gi, BOLD)
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"').replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, '&');
+
+  const parseWordText = (text) => {
+    const norm = text
+      .replace(/\r\n?/g, '\n')
+      .replace(/\u00a0/g, ' ')
+      // "...?A. xxx" → tách nhãn phương án bị dính ngay sau dấu câu
+      .replace(/([?”’"):.])(?=\u0001*[A-Ja-j]\s*[\.\)]\s)/g, '$1\n')
+      // "...D. xxx  Câu 2: ..." → tách mốc "Câu N" bị dính giữa dòng
+      .replace(/([^\n])[ \t]+(?=\u0001*c[âa]u\s*\d+\s*[\.\:\)\-–]?\s)/gi, '$1\n');
+
+    // Vị trí bắt đầu của từng câu. Đây là căn cứ duy nhất để đếm số câu trong file.
+    const findMarks = re => {
+      const out = []; let m;
+      while ((m = re.exec(norm)) !== null) {
+        out.push(m.index + m[1].length + m[2].length);
+        if (re.lastIndex === m.index) re.lastIndex++;
       }
-      // Assign candidate lines to option slots A..D by position. An explicit
-      // "A./B./C./D." label resyncs the slot, so options that lost their label
-      // (or are glued onto another line) still land in the right place.
+      return out;
+    };
+    // Lớp ký tự "rác" đứng đầu dòng: khoảng trắng, bullet, và dấu in đậm (BOLD) —
+    // dòng "Câu N" rất hay được bôi đậm nên dấu này nằm ngay trước chữ "Câu".
+    let marks = findMarks(/(^|\n)([ \t>•\-*\u0001]*)(c[âa]u\s*\d+\s*[\.\:\)\-–]?)/gi);
+    // File không dùng chữ "Câu" thì thử kiểu đánh số thuần "1." / "1)"
+    if (!marks.length) marks = findMarks(/(^|\n)([ \t>•\-*\u0001]*)(\d{1,3}\s*[\.\)]\s)/g);
+    if (!marks.length) return { parsed: [], found: 0 };
+
+    // Word hay trình bày phương án dạng bảng/2 cột nên mammoth dồn 2 phương án vào
+    // một dòng ("A. xxx  B. yyy") — tách để mỗi phương án / dòng meta nằm riêng.
+    const splitRe = /\s+(?=\u0001*(?:(?:[A-Ja-j]\s*[\.\)]\s)|(?:Đáp\s*án(?:\s*đúng)?|ĐA|Chủ\s*đề|Mức\s*độ)\s*[:\.\-]))/i;
+    const strip = s => (s || '').split(BOLD).join('').trim();
+    const parsed = [];
+
+    marks.forEach((start, bi) => {
+      const block = norm.slice(start, bi + 1 < marks.length ? marks[bi + 1] : undefined);
+      const lines = [];
+      for (const raw of block.split('\n')) {
+        const t = raw.trim();
+        if (!t) continue;
+        t.split(splitRe).forEach(s => { const x = s.trim(); if (x) lines.push(x); });
+      }
+
+      const issues = [];
+      const qText = strip(lines[0]).replace(/^(?:c[âa]u\s*\d+|\d{1,3})\s*[\.\:\)\-–]?\s*/i, '').trim();
+
+      let ansIdx = -1, topic = 'Nội quy', level = 'Dễ';
+      const cand = [];
+      for (let i = 1; i < lines.length; i++) {
+        const bare = strip(lines[i]);
+        const a = bare.match(/^(?:Đáp\s*án(?:\s*đúng)?(?:\s*là)?|ĐA|Answer|Key)\s*[:\.\-–]?\s*([A-Ja-j])\b/i);
+        if (a) { ansIdx = OPT_LETTERS.indexOf(a[1].toUpperCase()); continue; }
+        const tp = bare.match(/^Chủ\s*đề\s*[:\.\-]\s*(.+)/i);
+        if (tp) { topic = tp[1].trim(); continue; }
+        const lv = bare.match(/^Mức\s*độ\s*[:\.\-]\s*(.+)/i);
+        if (lv) { level = lv[1].trim(); continue; }
+        cand.push(lines[i]);
+      }
+
+      // Xếp các dòng phương án vào đúng ô A..J. Nhãn tường minh ("C.") sẽ đồng bộ
+      // lại vị trí, nên phương án bị mất nhãn vẫn rơi đúng chỗ.
       const slots = [];
       let next = 0;
-      for(const c of cand){
-        const m = c.match(/^([A-Da-d])\s*[\.\)]\s*(.*)/);
-        if(m){ const idx = 'abcd'.indexOf(m[1].toLowerCase()); slots[idx] = (m[2]||'').trim(); next = idx+1; }
+      for (const c of cand) {
+        const m = c.match(/^\u0001*([A-Ja-j])\s*[\.\)]\s*(.*)/);
+        if (m) { const idx = OPT_LETTERS.indexOf(m[1].toUpperCase()); slots[idx] = m[2] || ''; next = idx + 1; }
         else { slots[next] = c; next++; }
       }
-      // Take options contiguously from slot A so the answer index stays aligned
-      const opts = [];
-      for(let k=0;k<4;k++){ if(!slots[k] || !slots[k].trim()) break; opts.push(slots[k].trim()); }
-      // Keep a question if it has text, 2-4 options, and a valid answer pointing at a real option
-      if(qText && opts.length >= 2 && opts.length <= 4 && ansIdx >= 0 && ansIdx < opts.length)
-        parsed.push({id:Date.now()+Math.random(), text:qText, opts, ans:ansIdx, topic, level});
-      else
-        skipped++;
-    }
-    return {parsed, skipped};
+      // Lấy liên tiếp từ ô A để chỉ số đáp án không bị lệch
+      const rawOpts = [];
+      for (let k = 0; k < MAX_OPTS; k++) {
+        if (slots[k] === undefined || !strip(slots[k])) break;
+        rawOpts.push(slots[k]);
+      }
+
+      // Không có dòng "Đáp án" thì suy từ phương án được bôi đậm — chỉ tin khi
+      // đúng một phương án được bôi (cả khối cùng đậm thì tín hiệu vô nghĩa).
+      if (ansIdx < 0) {
+        const bold = rawOpts.map((o, i) => (o.includes(BOLD) ? i : -1)).filter(i => i >= 0);
+        if (bold.length === 1) ansIdx = bold[0];
+      }
+
+      const opts = rawOpts.map(strip);
+      if (cand.length > MAX_OPTS) issues.push(`chỉ giữ ${MAX_OPTS} phương án đầu`);
+      if (opts.length < 2) { issues.push('thiếu phương án trả lời'); while (opts.length < 2) opts.push(''); }
+      if (ansIdx < 0) { issues.push('chưa rõ đáp án đúng'); ansIdx = 0; }
+      else if (ansIdx >= opts.length) { issues.push(`đáp án ${OPT_LETTERS[ansIdx]} không có phương án tương ứng`); ansIdx = 0; }
+      if (!qText) issues.push('thiếu nội dung câu hỏi');
+
+      parsed.push({
+        id: Date.now() + Math.random(),
+        text: qText || `(Câu ${bi + 1} — chưa đọc được nội dung, cần nhập tay)`,
+        opts, ans: ansIdx, topic, level,
+        ...(issues.length ? { needsReview: true, _issues: issues } : {}),
+      });
+    });
+
+    return { parsed, found: marks.length };
   };
 
   const handleWordImport = async (e) => {
     const file = e.target.files[0]; if(!file) return;
     setImporting(true); setImportResult(null);
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({arrayBuffer});
-      const {parsed, skipped} = parseWordText(result.value);
-      if(parsed.length===0){
-        setImportResult({error:'Không tìm thấy câu hỏi hợp lệ nào. Mỗi câu cần có nội dung, từ 2 đến 4 đáp án (A, B, C, D) và dòng "Đáp án: X". Vui lòng kiểm tra lại định dạng file.'});
+      // Đọc theo 2 cách rồi lấy cách nhận ra nhiều câu hơn — mục tiêu là không sót câu.
+      let best = { parsed: [], found: 0 };
+      try {
+        const html = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() }, { styleMap: ['u => u'] });
+        best = parseWordText(htmlToMarkedText(html.value));
+      } catch { /* bỏ qua, vẫn còn cách đọc thô bên dưới */ }
+      const raw = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+      const rawRes = parseWordText(raw.value);
+      if (rawRes.found > best.found) best = rawRes;
+
+      if (best.found === 0) {
+        setImportResult({error:'Không tìm thấy câu hỏi nào trong file. Mỗi câu phải bắt đầu bằng "Câu 1:", "Câu 2:"... Bấm "File mẫu" để xem đúng định dạng.'});
       } else {
-        if(skipped>0) setImportResult({error:`Lưu ý: có ${skipped} câu bị bỏ qua do thiếu đáp án (cần 2-4 đáp án) hoặc thiếu dòng "Đáp án: X".`});
-        setPreviewList(parsed);
-      }    } catch(err) {
+        setPreviewList(best.parsed);
+      }
+    } catch(err) {
       setImportResult({error:'Không đọc được file Word. Vui lòng dùng định dạng .docx — lỗi: ' + err.message});
     }
     setImporting(false);
@@ -328,15 +396,20 @@ const Questions = ({questions, setQuestions}) => {
   };
 
   const confirmImport = () => {
+    const n = previewList.length;
+    const review = previewList.filter(q => q.needsReview).length;
     setQuestions(p=>{
       // Append imported questions after existing ones with a continuous order
       const base = p.reduce((m,q)=>Math.max(m, q.order||0), 0);
-      const ordered = previewList.map((q,i)=>({...q, order: base + i + 1}));
+      const ordered = previewList.map((q,i)=>{
+        const { _issues, ...rest } = q;   // _issues chỉ dùng để hiển thị ở màn xem trước
+        return { ...rest, order: base + i + 1 };
+      });
       return [...p, ...ordered];
     });
-    setImportResult({added:previewList.length});
+    setImportResult({added:n, review});
     setPreviewList(null);
-    setTimeout(()=>setImportResult(null), 2000);
+    setTimeout(()=>setImportResult(null), 6000);
   };
 
   const downloadWordTemplate = () => {
@@ -384,21 +457,29 @@ LƯU Ý:
             <div className="flex items-center justify-between p-5 border-b">
               <div>
                 <h2 className="font-bold text-slate-800">Xem trước câu hỏi import</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Tìm thấy <span className="font-semibold text-emerald-600">{previewList.length} câu hỏi</span> — kiểm tra trước khi thêm vào ngân hàng</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Đọc được <span className="font-semibold text-emerald-600">{previewList.length} câu</span> — sẽ nhập đủ cả {previewList.length} câu
+                  {previewList.some(q=>q.needsReview) && <>, trong đó <span className="font-semibold text-amber-600">{previewList.filter(q=>q.needsReview).length} câu cần sửa tay</span></>}
+                </p>
               </div>
               <button onClick={()=>setPreviewList(null)} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {previewList.map((q,i)=>(
-                <div key={i} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <div className="flex gap-2 mb-2">
+                <div key={i} className={`rounded-xl p-4 border ${q.needsReview?'bg-amber-50 border-amber-200':'bg-slate-50 border-slate-100'}`}>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="text-xs font-mono text-slate-400">#{i+1}</span>
+                    {q.needsReview && (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                        <AlertCircle size={11}/>Cần sửa tay: {q._issues.join(', ')}
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm font-medium text-slate-700 mb-2">{q.text}</p>
                   <div className="grid grid-cols-2 gap-1">
                     {q.opts.map((o,j)=>(
                       <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg ${j===q.ans?'bg-emerald-50 text-emerald-700 font-medium border border-emerald-200':'bg-white text-slate-500 border border-slate-100'}`}>
-                        {String.fromCharCode(65+j)}. {o}
+                        {OPT_LETTERS[j]}. {o || <span className="italic text-slate-300">(trống)</span>}
                       </div>
                     ))}
                   </div>
@@ -433,7 +514,14 @@ LƯU Ý:
         <div className={`mb-4 rounded-xl p-4 flex items-start gap-3 ${importResult.error?'bg-red-50 border border-red-200':'bg-emerald-50 border border-emerald-200'}`}>
           {importResult.error ? <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5"/> : <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5"/>}
           <p className={`text-sm flex-1 ${importResult.error?'text-red-700':'text-emerald-800 font-medium'}`}>
-            {importResult.error || `Đã thêm thành công ${importResult.added} câu hỏi vào ngân hàng!`}
+            {importResult.error || (
+              <>
+                Đã thêm đủ {importResult.added} câu hỏi vào ngân hàng!
+                {importResult.review > 0 && <span className="block font-normal text-amber-700 mt-1">
+                  Trong đó {importResult.review} câu còn thiếu thông tin (đánh dấu <b>Cần sửa</b> ở danh sách bên dưới) — bấm sửa lại đáp án đúng trước khi đưa vào đề thi.
+                </span>}
+              </>
+            )}
           </p>
           <button onClick={()=>setImportResult(null)} className="text-slate-400 hover:text-slate-600"><X size={14}/></button>
         </div>
@@ -488,8 +576,13 @@ LƯU Ý:
           <div key={q.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <span className="text-xs font-mono text-slate-400">#{idx+1}</span>
+                  {q.needsReview && (
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                      <AlertCircle size={11}/>Cần sửa
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm font-medium text-slate-700 mb-2">{q.text}</p>
                 <div className="grid grid-cols-2 gap-1.5">
