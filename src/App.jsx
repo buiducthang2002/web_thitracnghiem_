@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, XCircle, Award, Home, Play, TrendingUp, TrendingDown, X, ChevronRight, Shield, ShieldCheck, Star, ArrowRight, ArrowLeft, Upload, Download, AlertCircle, Info, FileSearch, PieChart as PieChartIcon } from "lucide-react";
+import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, Award, Home, Play, TrendingUp, TrendingDown, X, ChevronRight, Shield, ShieldCheck, Star, ArrowRight, ArrowLeft, Upload, Download, AlertCircle, Info, FileSearch, PieChart as PieChartIcon } from "lucide-react";
 import { db, missingConfig, projectId } from "./firebase";
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
@@ -1542,42 +1542,18 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
 };
 
 // ── RESULT SCREEN ──
+// Nộp bài xong chỉ báo ngắn gọn số câu đúng — không hiển thị lại đáp án đúng
+// để tránh lộ nội dung ngân hàng câu hỏi cho các lượt thi sau.
 const ResultScreen = ({result, exam, questions, onBack}) => {
-  const qs = exam.qIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
+  const total = exam.qIds.filter(id => questions.some(q => q.id === id)).length;
   const ok = result.score>=exam.pass;
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-2xl mx-auto p-4 md:p-6">
-        <div className={`rounded-2xl p-8 text-center mb-6 text-white ${ok?'bg-emerald-500':'bg-red-500'}`}>
-          <div className="text-5xl mb-3">{ok?'🎉':'😔'}</div>
-          <div className="text-4xl font-bold mb-1">{result.score}%</div>
-          <div className="text-base font-medium opacity-90 mb-2">{ok?'Chúc mừng! Bạn đã đạt yêu cầu':'Bạn chưa đạt yêu cầu lần này'}</div>
-          <div className="opacity-75 text-sm">{result.correct}/{qs.length} câu đúng • Cần đạt {exam.pass}%</div>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className={`rounded-2xl px-6 py-5 text-center text-white font-medium ${ok?'bg-emerald-500':'bg-red-500'}`}>
+          {result.correct}/{total} câu đúng • Cần đạt {exam.pass}%
         </div>
-        <h2 className="font-semibold text-slate-700 mb-3 text-sm">Chi tiết đáp án</h2>
-        <div className="space-y-3 mb-6">
-          {qs.map((q,i)=>{
-            const ua=result.answers[i]; const correct=ua===q.ans;
-            return (
-              <div key={q.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-                <div className="flex items-start gap-2 mb-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${correct?'bg-emerald-100 text-emerald-600':'bg-red-100 text-red-600'}`}>
-                    {correct?<CheckCircle size={14}/>:<XCircle size={14}/>}
-                  </div>
-                  <p className="text-sm font-medium text-slate-700">{i+1}. {q.text}</p>
-                </div>
-                <div className="pl-8 space-y-1">
-                  {q.opts.map((o,j)=>(
-                    <div key={j} className={`text-xs px-3 py-1.5 rounded-lg ${j===q.ans?'bg-emerald-50 text-emerald-700 font-medium':j===ua&&!correct?'bg-red-50 text-red-600':'text-slate-500'}`}>
-                      {String.fromCharCode(65+j)}. {o}{j===q.ans?' ✓':''}{j===ua&&!correct?' ✗ (bạn chọn)':''}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <button onClick={onBack} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700">← Quay lại trang chủ</button>
+        <button onClick={onBack} className="mt-4 w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700">← Quay lại trang chủ</button>
       </div>
     </div>
   );
