@@ -3,3 +3,7 @@ dist/
 .env
 .DS_Store
 *.local
+
+# Tài liệu nguồn (ngân hàng câu hỏi, đề thi) - không đưa lên repo public
+*.docx
+*.doc

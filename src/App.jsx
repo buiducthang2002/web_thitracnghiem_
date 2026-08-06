@@ -73,7 +73,7 @@ const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
       <div className={`hidden md:flex ${rail?'w-[78px]':'w-[168px]'} bg-white h-screen flex-col fixed left-0 top-0 z-10 border-r border-slate-200/80 transition-[width] duration-200`}>
         <div className="py-5 flex flex-col items-center gap-1.5 flex-shrink-0">
           <Emblem size={rail?52:76}/>
-          {!rail && <div className="text-[10px] font-bold text-[#0B4F32] text-center leading-tight px-2">Quân khu 4</div>}
+          {!rail && <div className="text-[10px] font-bold text-[#0B4F32] text-center leading-tight px-2">ĐOÀN KINH TẾ - QUỐC PHÒNG 92</div>}
         </div>
 
         <nav className="flex-1 px-2.5 space-y-1.5 relative">
@@ -109,7 +109,7 @@ const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
         <div className="flex items-center gap-2 flex-shrink-0">
           <Emblem size={34}/>
           <div>
-            <div className="text-[#0B4F32] font-bold text-[10px] leading-tight whitespace-nowrap"> Quân khu 4</div>
+            <div className="text-[#0B4F32] font-bold text-[10px] leading-tight whitespace-nowrap"> ĐOÀN KINH TẾ - QUỐC PHÒNG 92</div>
             <div className="text-slate-400 text-[9px] whitespace-nowrap">Hệ thống thi trắc nghiệm</div>
           </div>
         </div>
@@ -1698,8 +1698,8 @@ const Login = ({onLogin, employees}) => {
         {/* HEADER */}
         <div className="text-center">
           <div className="flex justify-center"><Emblem size={128}/></div>
-          <h1 className="mt-3 text-xl sm:text-3xl font-bold text-[#0B4F32] tracking-tight">Quân khu 4</h1>
-          <p className="mt-1.5 text-slate-600 text-sm">Hệ thống thi trắc nghiệm nội bộ</p>
+          <h1 className="mt-3 text-xl sm:text-1xl font-bold text-[#0B4F32] tracking-tight">ĐOÀN KINH TẾ - QUỐC PHÒNG 92</h1>
+          <p className="mt-1.5 text-slate-600 text-sm">BAN TỔ CHỨC HỘI THI BÍ THƯ CHI BỘ NĂM 2026</p>
           <StarDivider/>
         </div>
 
