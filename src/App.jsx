@@ -386,7 +386,13 @@ const Questions = ({questions, setQuestions}) => {
       if (best.found === 0) {
         setImportResult({error:'Không tìm thấy câu hỏi nào trong file. Mỗi câu phải bắt đầu bằng "Câu 1:", "Câu hỏi 1:"... Bấm "File mẫu" để xem đúng định dạng.'});
       } else {
-        setPreviewList(best.parsed);
+        // Giữ dấu vết file nguồn để lúc tạo đề có thể chọn cả file bằng một lần bấm.
+        const importBatchId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        setPreviewList(best.parsed.map(q => ({
+          ...q,
+          importBatchId,
+          importFileName: file.name.replace(/\.docx$/i, ''),
+        })));
       }
     } catch(err) {
       setImportResult({error:'Không đọc được file Word. Vui lòng dùng định dạng .docx — lỗi: ' + err.message});
@@ -399,13 +405,15 @@ const Questions = ({questions, setQuestions}) => {
     const n = previewList.length;
     const review = previewList.filter(q => q.needsReview).length;
     setQuestions(p=>{
-      // Append imported questions after existing ones with a continuous order
-      const base = p.reduce((m,q)=>Math.max(m, q.order||0), 0);
+      // Chuẩn hóa câu cũ trước, rồi nối file mới ngay sau câu cuối:
+      // file đầu 1..40, file tiếp theo 41..80, v.v.
+      const existing = orderedQuestions(p).map((q, i) => ({ ...q, order: i + 1 }));
+      const base = existing.length;
       const ordered = previewList.map((q,i)=>{
         const { _issues, ...rest } = q;   // _issues chỉ dùng để hiển thị ở màn xem trước
         return { ...rest, order: base + i + 1 };
       });
-      return [...p, ...ordered];
+      return [...existing, ...ordered];
     });
     setImportResult({added:n, review});
     setPreviewList(null);
@@ -577,7 +585,7 @@ LƯU Ý:
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <span className="text-xs font-mono text-slate-400">#{idx+1}</span>
+                  <span className="text-xs font-mono text-slate-400">#{q.order ?? idx+1}</span>
                   {q.needsReview && (
                     <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                       <AlertCircle size={11}/>Cần sửa
@@ -607,6 +615,40 @@ const Exams = ({exams, setExams, questions}) => {
   const [modal, setModal] = useState(false);
   const [ne, setNe] = useState({title:'',desc:'',qIds:[],time:20,pass:70});
   const toggleQ = id => setNe(p=>({...p,qIds:p.qIds.includes(id)?p.qIds.filter(x=>x!==id):[...p.qIds,id]}));
+  const sortedQuestions = orderedQuestions(questions);
+  const importedGroups = Object.values(sortedQuestions.reduce((groups, q) => {
+    if (!q.importBatchId) return groups;
+    if (!groups[q.importBatchId]) groups[q.importBatchId] = {
+      id: q.importBatchId,
+      name: q.importFileName || 'File Word đã import',
+      qIds: [],
+    };
+    groups[q.importBatchId].qIds.push(q.id);
+    return groups;
+  }, {}));
+  // Dữ liệu đã import trước khi có importBatchId vẫn được chọn nhanh theo từng khối 40 câu.
+  const legacyQuestions = sortedQuestions.filter(q => !q.importBatchId);
+  const legacyGroups = [];
+  for (let i = 0; i < legacyQuestions.length; i += 40) {
+    const chunk = legacyQuestions.slice(i, i + 40);
+    const first = chunk[0]?.order ?? i + 1;
+    const last = chunk[chunk.length - 1]?.order ?? i + chunk.length;
+    legacyGroups.push({
+      id: `legacy-${i}`,
+      name: `Câu ${first}–${last} (dữ liệu cũ)`,
+      qIds: chunk.map(q => q.id),
+    });
+  }
+  const importGroups = [...importedGroups, ...legacyGroups];
+  const toggleImportGroup = group => setNe(p => {
+    const allSelected = group.qIds.every(id => p.qIds.includes(id));
+    return {
+      ...p,
+      qIds: allSelected
+        ? p.qIds.filter(id => !group.qIds.includes(id))
+        : [...new Set([...p.qIds, ...group.qIds])],
+    };
+  });
   const create = () => {
     if(!ne.title.trim()||ne.qIds.length===0) return;
     setExams(p=>[...p,{...ne,id:Date.now()}]); setModal(false);
@@ -637,6 +679,21 @@ const Exams = ({exams, setExams, questions}) => {
                   <input type="number" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" value={ne.pass} onChange={e=>setNe({...ne,pass:+e.target.value})}/></div>
               </div>
               <div><label className="text-xs font-medium text-slate-600 mb-2 block">Chọn câu hỏi ({ne.qIds.length} đã chọn)</label>
+                {importGroups.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    <p className="text-[11px] text-slate-400">Chọn nhanh theo file Word đã import</p>
+                    {importGroups.map(group => {
+                      const selected = group.qIds.every(id => ne.qIds.includes(id));
+                      return (
+                        <button key={group.id} type="button" onClick={()=>toggleImportGroup(group)}
+                          className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg border text-left ${selected?'bg-emerald-50 border-emerald-300 text-emerald-700':'bg-white border-slate-200 text-slate-600 hover:border-emerald-300'}`}>
+                          <span className="text-xs font-medium truncate">{group.name}</span>
+                          <span className="text-[11px] flex-shrink-0">{selected?'Đã chọn':'Chọn cả'} {group.qIds.length} câu</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="space-y-1 max-h-48 overflow-y-auto border border-slate-100 rounded-xl p-2">
                   {orderedQuestions(questions).map(q=>(
                     <label key={q.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
