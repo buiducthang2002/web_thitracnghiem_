@@ -278,8 +278,8 @@ const Questions = ({questions, setQuestions}) => {
       .replace(/\u00a0/g, ' ')
       // "...?A. xxx" → tách nhãn phương án bị dính ngay sau dấu câu
       .replace(/([?”’"):.])(?=\u0001*[A-Ja-j]\s*[\.\)]\s)/g, '$1\n')
-      // "...D. xxx  Câu 2: ..." → tách mốc "Câu N" bị dính giữa dòng
-      .replace(/([^\n])[ \t]+(?=\u0001*c[âa]u\s*\d+\s*[\.\:\)\-–]?\s)/gi, '$1\n');
+      // "...D. xxx  Câu 2: ..." / "Câu hỏi 2: ..." → tách mốc câu bị dính giữa dòng
+      .replace(/([^\n])[ \t]+(?=\u0001*c[âa]u(?:\s+hỏi)?\s*\d+\s*[\.\:\)\-–]?\s)/gi, '$1\n');
 
     // Vị trí bắt đầu của từng câu. Đây là căn cứ duy nhất để đếm số câu trong file.
     const findMarks = re => {
@@ -292,7 +292,7 @@ const Questions = ({questions, setQuestions}) => {
     };
     // Lớp ký tự "rác" đứng đầu dòng: khoảng trắng, bullet, và dấu in đậm (BOLD) —
     // dòng "Câu N" rất hay được bôi đậm nên dấu này nằm ngay trước chữ "Câu".
-    let marks = findMarks(/(^|\n)([ \t>•\-*\u0001]*)(c[âa]u\s*\d+\s*[\.\:\)\-–]?)/gi);
+    let marks = findMarks(/(^|\n)([ \t>•\-*\u0001]*)(c[âa]u(?:\s+hỏi)?\s*\d+\s*[\.\:\)\-–]?)/gi);
     // File không dùng chữ "Câu" thì thử kiểu đánh số thuần "1." / "1)"
     if (!marks.length) marks = findMarks(/(^|\n)([ \t>•\-*\u0001]*)(\d{1,3}\s*[\.\)]\s)/g);
     if (!marks.length) return { parsed: [], found: 0 };
@@ -313,7 +313,7 @@ const Questions = ({questions, setQuestions}) => {
       }
 
       const issues = [];
-      const qText = strip(lines[0]).replace(/^(?:c[âa]u\s*\d+|\d{1,3})\s*[\.\:\)\-–]?\s*/i, '').trim();
+      const qText = strip(lines[0]).replace(/^(?:c[âa]u(?:\s+hỏi)?\s*\d+|\d{1,3})\s*[\.\:\)\-–]?\s*/i, '').trim();
 
       let ansIdx = -1, topic = 'Nội quy', level = 'Dễ';
       const cand = [];
@@ -384,7 +384,7 @@ const Questions = ({questions, setQuestions}) => {
       if (rawRes.found > best.found) best = rawRes;
 
       if (best.found === 0) {
-        setImportResult({error:'Không tìm thấy câu hỏi nào trong file. Mỗi câu phải bắt đầu bằng "Câu 1:", "Câu 2:"... Bấm "File mẫu" để xem đúng định dạng.'});
+        setImportResult({error:'Không tìm thấy câu hỏi nào trong file. Mỗi câu phải bắt đầu bằng "Câu 1:", "Câu hỏi 1:"... Bấm "File mẫu" để xem đúng định dạng.'});
       } else {
         setPreviewList(best.parsed);
       }
