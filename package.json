@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "firebase": "^10.12.0",
+    "jszip": "^3.10.1",
+    "legacy-doc-reader": "https://github.com/Alpaq92/JSDoc/archive/821695a884e0c0bb8592a635d9524bb3e116cd67.tar.gz",
     "lucide-react": "^0.383.0",
     "mammoth": "^1.7.2",
     "react": "^18.3.1",

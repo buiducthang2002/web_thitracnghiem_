@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
+import legacyDocToText from "legacy-doc-reader";
+import JSZip from "jszip";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, Award, Home, Play, TrendingUp, TrendingDown, X, ChevronRight, Shield, ShieldCheck, Star, ArrowRight, ArrowLeft, Upload, Download, AlertCircle, Info, FileSearch, PieChart as PieChartIcon } from "lucide-react";
 import { db, missingConfig, projectId } from "./firebase";
@@ -73,7 +75,7 @@ const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
       <div className={`hidden md:flex ${rail?'w-[78px]':'w-[168px]'} bg-white h-screen flex-col fixed left-0 top-0 z-10 border-r border-slate-200/80 transition-[width] duration-200`}>
         <div className="py-5 flex flex-col items-center gap-1.5 flex-shrink-0">
           <Emblem size={rail?52:76}/>
-          {!rail && <div className="text-[10px] font-bold text-[#0B4F32] text-center leading-tight px-2">ĐOÀN KINH TẾ - QUỐC PHÒNG 92</div>}
+          {!rail && <div className="text-[10px] font-bold text-[#0B4F32] text-center leading-tight px-2">CỤC HẬU CẦN KỸ THUẬT QUÂN KHU 4</div>}
         </div>
 
         <nav className="flex-1 px-2.5 space-y-1.5 relative">
@@ -109,7 +111,7 @@ const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
         <div className="flex items-center gap-2 flex-shrink-0">
           <Emblem size={34}/>
           <div>
-            <div className="text-[#0B4F32] font-bold text-[10px] leading-tight whitespace-nowrap"> ĐOÀN KINH TẾ - QUỐC PHÒNG 92</div>
+            <div className="text-[#0B4F32] font-bold text-[10px] leading-tight whitespace-nowrap">CỤC HẬU CẦN KỸ THUẬT QUÂN KHU 4</div>
             <div className="text-slate-400 text-[9px] whitespace-nowrap">Hệ thống thi trắc nghiệm</div>
           </div>
         </div>
@@ -231,6 +233,7 @@ const Dashboard = ({results, exams, questions, employees}) => {
 // ── QUESTIONS ──
 const Questions = ({questions, setQuestions}) => {
   const [modal, setModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [nq, setNq] = useState({topic:'Nội quy',level:'Dễ',text:'',opts:['','','',''],ans:0});
   const [customTopic, setCustomTopic] = useState('');
   const [importing, setImporting] = useState(false);
@@ -244,13 +247,45 @@ const Questions = ({questions, setQuestions}) => {
 
   const effectiveTopic = nq.topic==='__custom__' ? customTopic.trim() : nq.topic;
 
-  const add = () => {
+  const resetQuestionForm = () => {
+    setModal(false);
+    setEditingId(null);
+    setCustomTopic('');
+    setNq({topic:'Nội quy',level:'Dễ',text:'',opts:['','','',''],ans:0});
+  };
+
+  const openAdd = () => {
+    setEditingId(null);
+    setCustomTopic('');
+    setNq({topic:'Nội quy',level:'Dễ',text:'',opts:['','','',''],ans:0});
+    setModal(true);
+  };
+
+  const openEdit = q => {
+    setEditingId(q.id);
+    setCustomTopic('');
+    setNq({
+      topic: q.topic || 'Nội quy',
+      level: q.level || 'Dễ',
+      text: q.text || '',
+      opts: [...(q.opts || ['', ''])],
+      ans: Number.isInteger(q.ans) ? q.ans : 0,
+    });
+    setModal(true);
+  };
+
+  const saveQuestion = () => {
     if(!nq.text.trim()||nq.opts.some(o=>!o.trim())) return;
     if(!effectiveTopic) return;
-    setQuestions(p=>[...p,{...nq, topic:effectiveTopic, id:Date.now(), order: p.reduce((m,q)=>Math.max(m, q.order||0), 0) + 1}]);
-    setModal(false);
-    setNq({topic:'Nội quy',level:'Dễ',text:'',opts:['','','',''],ans:0});
-    setCustomTopic('');
+    const updated = {...nq, text:nq.text.trim(), opts:nq.opts.map(o=>o.trim()), topic:effectiveTopic};
+    if (editingId !== null) {
+      setQuestions(p=>p.map(q=>q.id===editingId
+        ? {...q, ...updated, needsReview:false, _issues:undefined}
+        : q));
+    } else {
+      setQuestions(p=>[...p,{...updated, id:Date.now(), order: p.reduce((m,q)=>Math.max(m, q.order||0), 0) + 1}]);
+    }
+    resetQuestionForm();
   };
 
   // ── Đọc câu hỏi từ file Word ────────────────────────────────────────────
@@ -261,7 +296,94 @@ const Questions = ({questions, setQuestions}) => {
 
   // mammoth.extractRawText làm mất định dạng, mà rất nhiều file lại đánh dấu đáp án
   // đúng bằng cách bôi đậm / gạch chân. Đọc thêm bản HTML rồi giữ lại dấu đó.
-  const htmlToMarkedText = html => html
+  const markStyledRuns = html => html.replace(/<span\b([^>]*)>([\s\S]*?)<\/span>/gi, (all, attrs, content) => {
+    const marked = /font-weight\s*:\s*(?:bold|[6-9]00)/i.test(attrs) ||
+      /text-decoration[^;]*(?:underline)/i.test(attrs) ||
+      /color\s*:\s*(?:#(?:f00|ff0000)\b|rgb\(\s*255\s*,\s*0\s*,\s*0\s*\))/i.test(attrs);
+    return marked ? `${BOLD}${content}${BOLD}` : content;
+  });
+
+  // Phần mở rộng file rất hay bị đặt sai (đổi tên .doc thành .docx, file do phần mềm
+  // khác xuất ra...) nên cách đọc phải căn cứ vào chữ ký ở đầu file.
+  const decodeBytes = (bytes) => {
+    const head = String.fromCharCode.apply(null, bytes.slice(0, 2048));
+    const declared = /charset\s*=\s*["']?\s*([\w-]+)/i.exec(head);
+    for (const enc of [declared && declared[1], 'utf-8']) {
+      if (!enc) continue;
+      try { return new TextDecoder(enc).decode(bytes); } catch { /* bảng mã lạ thì thử cách sau */ }
+    }
+    return new TextDecoder().decode(bytes);
+  };
+
+  const sniffFileKind = (buffer) => {
+    const b = new Uint8Array(buffer);
+    if (b[0] === 0x50 && b[1] === 0x4b) return 'zip';                                   // .docx (thực chất là file nén)
+    if (b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0) return 'ole';  // .doc Word 97–2003
+    const head = decodeBytes(b.slice(0, 4096)).replace(/^﻿/, '').trimStart();
+    if (/^\{\\rtf/i.test(head)) return 'rtf';
+    if (/^(?:<!doctype\s+html|<html|<body|mime-version:)/i.test(head)) return 'html';
+    return 'text';
+  };
+
+  const unescapeXml = s => s
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(+d))
+    .replace(/&amp;/g, '&');
+
+  // Bóc chữ thẳng từ XML bên trong file nén. Dùng khi mammoth từ chối đọc file
+  // (báo "Could not find the body element") vì file do phần mềm khác sinh ra:
+  // thẻ w:body bị đổi tên, thiếu khai báo namespace... Ở đây chỉ dựa vào tên thẻ
+  // nên đọc được cả những file không đúng chuẩn.
+  const wordXmlToMarkedText = (xml) => {
+    // Mỗi đoạn chữ (w:r) in đậm / gạch chân được đánh dấu lại, vì rất nhiều file
+    // đánh dấu đáp án đúng bằng cách này.
+    const marked = xml.replace(/<(?:\w+:)?r(?:\s[^>]*)?>([\s\S]*?)<\/(?:\w+:)?r>/g, (all, run) => {
+      const pr = /<(?:\w+:)?rPr(?:\s[^>]*)?>([\s\S]*?)<\/(?:\w+:)?rPr>/.exec(run);
+      const props = pr ? pr[1] : '';
+      const on = (tag) => {
+        const m = new RegExp(`<(?:\\w+:)?${tag}(?:\\s[^>]*)?/?>`).exec(props);
+        return !!m && !/val="(?:0|false|off|none)"/i.test(m[0]);
+      };
+      const body = run
+        .replace(/<(?:\w+:)?rPr(?:\s[^>]*)?>[\s\S]*?<\/(?:\w+:)?rPr>/g, '')
+        .replace(/<(?:\w+:)?(?:instrText|delText)(?:\s[^>]*)?>[\s\S]*?<\/(?:\w+:)?(?:instrText|delText)>/g, '')
+        .replace(/<(?:\w+:)?tab(?:\s[^>]*)?\/?>/g, ' ')
+        .replace(/<(?:\w+:)?br(?:\s[^>]*)?\/?>/g, '\n')
+        .replace(/<[^>]+>/g, '');
+      return body && (on('b') || on('u')) ? `${BOLD}${body}${BOLD}` : body;
+    });
+    return unescapeXml(marked
+      .replace(/<\/(?:\w+:)?(?:p|tc|tr|h[1-6])>/gi, '\n')
+      .replace(/<(?:\w+:)?br(?:\s[^>]*)?\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ''))
+      .replace(/[ \t]+\n/g, '\n');
+  };
+
+  const zipDocumentToMarkedText = async (buffer) => {
+    const zip = await JSZip.loadAsync(buffer);
+    // word/document.xml (.docx) trước, content.xml (.odt của LibreOffice) sau.
+    const parts = Object.keys(zip.files)
+      .filter(n => /(^|\/)(document\d*\.xml|content\.xml)$/i.test(n) && !/_rels/i.test(n))
+      .sort((a, b) => (/document\.xml$/i.test(b) ? 1 : 0) - (/document\.xml$/i.test(a) ? 1 : 0));
+    let out = '';
+    for (const name of parts) out += wordXmlToMarkedText(await zip.file(name).async('string')) + '\n';
+    return out;
+  };
+
+  // RTF: file .doc/.rtf do máy Mac hoặc phần mềm soạn thảo khác xuất ra.
+  const rtfToText = (rtf) => rtf
+    .replace(/\{\\\*?\\(?:fonttbl|colortbl|stylesheet|info|generator|pict|themedata|colorschememapping)[\s\S]*?\}\s*/gi, '')
+    .replace(/\\'([0-9a-f]{2})/gi, (m, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\u(-?\d+)\s?\??/g, (m, n) => String.fromCharCode(((+n) + 65536) % 65536))
+    .replace(/\\pard\b/g, '')
+    .replace(/\\(?:par|line)\b/g, '\n')
+    .replace(/\\tab\b/g, '\t')
+    .replace(/\\[a-z]+-?\d*\s?/gi, '')
+    .replace(/[{}]/g, '')
+    .replace(/\r\n?/g, '\n');
+
+  const htmlToMarkedText = html => markStyledRuns(html)
     .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n')
     .replace(/<\/t[dh]>/gi, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
@@ -369,33 +491,77 @@ const Questions = ({questions, setQuestions}) => {
     return { parsed, found: marks.length };
   };
 
+  // Lỗi kỹ thuật của thư viện đọc file không nói lên điều gì với người dùng, nên
+  // dịch sang việc cần làm tiếp theo.
+  const wordImportError = (kind, gotText, details) => {
+    const detail = details.length ? ` (chi tiết kỹ thuật: ${details[0]})` : '';
+    if (gotText) {
+      return 'Đọc được nội dung file nhưng không tìm thấy câu hỏi nào. Mỗi câu phải bắt đầu bằng "Câu 1:", "Câu hỏi 1:"... Bấm "File mẫu" để xem đúng định dạng.';
+    }
+    if (kind === 'zip') {
+      return 'File .docx này không đúng chuẩn Word nên không lấy được nội dung — thường gặp ở file do phần mềm khác tạo ra (chuyển từ PDF, ứng dụng đọc file trên điện thoại...). Hãy mở file bằng Word rồi chọn File → Save As → Word Document (*.docx) và import lại.' + detail;
+    }
+    if (kind === 'ole') {
+      return 'File .doc (Word 97–2003) bị hỏng, đặt mật khẩu hoặc thuộc phiên bản quá cũ. Hãy mở bằng Word rồi lưu lại dưới dạng .docx và import lại.' + detail;
+    }
+    return 'File không có nội dung chữ nào đọc được. Hãy mở bằng Word rồi lưu lại dưới dạng .docx và import lại.' + detail;
+  };
+
   const handleWordImport = async (e) => {
     const file = e.target.files[0]; if(!file) return;
     setImporting(true); setImportResult(null);
     try {
-      // Đọc theo 2 cách rồi lấy cách nhận ra nhiều câu hơn — mục tiêu là không sót câu.
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      const kind = sniffFileKind(buffer);   // tin chữ ký trong file, không tin phần mở rộng
+      const details = [];
+      let gotText = false;
+
+      // Thử nhiều cách đọc rồi lấy cách nhận ra nhiều câu hơn — mục tiêu là không sót câu.
       let best = { parsed: [], found: 0 };
-      try {
-        const html = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() }, { styleMap: ['u => u'] });
-        best = parseWordText(htmlToMarkedText(html.value));
-      } catch { /* bỏ qua, vẫn còn cách đọc thô bên dưới */ }
-      const raw = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-      const rawRes = parseWordText(raw.value);
-      if (rawRes.found > best.found) best = rawRes;
+      const read = async (fn) => {
+        try {
+          const text = await fn();
+          if (!text || !text.trim()) return;
+          gotText = true;
+          const res = parseWordText(text);
+          if (res.found > best.found) best = res;
+        } catch (err) { details.push(err.message); }
+      };
+
+      if (kind === 'zip') {
+        // .docx: bản HTML giữ được in đậm/gạch chân (dấu hiệu đáp án đúng), bản thô để đối chiếu.
+        await read(async () => htmlToMarkedText((await mammoth.convertToHtml({ arrayBuffer: buffer }, { styleMap: ['u => u'] })).value));
+        await read(async () => (await mammoth.extractRawText({ arrayBuffer: buffer })).value);
+        // mammoth chỉ đọc được file đúng chuẩn Word; file lệch chuẩn thì bóc thẳng XML.
+        if (best.found === 0) await read(() => zipDocumentToMarkedText(buffer));
+      } else if (kind === 'ole') {
+        // Word 97–2003 (.doc) là định dạng OLE nhị phân; mammoth chỉ hỗ trợ .docx.
+        // legacy-doc-reader chạy hoàn toàn trong trình duyệt và giữ tài liệu ở máy người dùng.
+        await read(() => { const s = legacyDocToText.html(buffer); return s && s.body ? htmlToMarkedText(s.body) : ''; });
+        await read(() => legacyDocToText(buffer) || '');
+      } else if (kind === 'html') {
+        // File Word lưu dạng trang web, hoặc chính file mẫu tải về từ nút "File mẫu".
+        await read(() => htmlToMarkedText(decodeBytes(bytes)));
+      } else if (kind === 'rtf') {
+        await read(() => rtfToText(decodeBytes(bytes)));
+      } else {
+        await read(() => decodeBytes(bytes));
+      }
 
       if (best.found === 0) {
-        setImportResult({error:'Không tìm thấy câu hỏi nào trong file. Mỗi câu phải bắt đầu bằng "Câu 1:", "Câu hỏi 1:"... Bấm "File mẫu" để xem đúng định dạng.'});
+        setImportResult({ error: wordImportError(kind, gotText, details) });
       } else {
         // Giữ dấu vết file nguồn để lúc tạo đề có thể chọn cả file bằng một lần bấm.
         const importBatchId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         setPreviewList(best.parsed.map(q => ({
           ...q,
           importBatchId,
-          importFileName: file.name.replace(/\.docx$/i, ''),
+          importFileName: file.name.replace(/\.(?:docx?|docm|rtf|txt|html?|odt)$/i, ''),
         })));
       }
     } catch(err) {
-      setImportResult({error:'Không đọc được file Word. Vui lòng dùng định dạng .docx — lỗi: ' + err.message});
+      setImportResult({error:'Không đọc được file Word (.doc hoặc .docx) — lỗi: ' + err.message});
     }
     setImporting(false);
     e.target.value='';
@@ -511,10 +677,10 @@ LƯU Ý:
             <Download size={14}/>File mẫu
           </button>
           <button onClick={()=>wordRef.current.click()} disabled={importing} className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-60">
-            <Upload size={14}/>{importing?'Đang đọc...':'Import Word'}
+            <Upload size={14}/>{importing?'Đang đọc...':'Import Word (.doc/.docx)'}
           </button>
-          <input ref={wordRef} type="file" accept=".docx" className="hidden" onChange={handleWordImport}/>
-          <button onClick={()=>setModal(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium"><Plus size={15}/>Thêm câu hỏi</button>
+          <input ref={wordRef} type="file" accept=".doc,.docx,.docm,.rtf,.txt,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleWordImport}/>
+          <button onClick={openAdd} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium"><Plus size={15}/>Thêm câu hỏi</button>
         </div>
       </div>
 
@@ -538,8 +704,8 @@ LƯU Ý:
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
-              <h2 className="font-bold text-slate-800">Thêm câu hỏi mới</h2>
-              <button onClick={()=>{setModal(false);setCustomTopic('');setNq({topic:'Nội quy',level:'Dễ',text:'',opts:['','','',''],ans:0});}} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+              <h2 className="font-bold text-slate-800">{editingId!==null?'Chỉnh sửa câu hỏi':'Thêm câu hỏi mới'}</h2>
+              <button onClick={resetQuestionForm} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -558,22 +724,33 @@ LƯU Ý:
                     />
                   )}
                 </div>
+                <div><label className="text-xs font-medium text-slate-600 mb-1 block">Mức độ</label>
+                  <select className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" value={nq.level} onChange={e=>setNq({...nq,level:e.target.value})}>
+                    <option value="Dễ">Dễ</option><option value="TB">Trung bình</option><option value="Khó">Khó</option>
+                  </select>
+                </div>
               </div>
               <div><label className="text-xs font-medium text-slate-600 mb-1 block">Nội dung câu hỏi</label>
                 <textarea className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none" rows={3} value={nq.text} onChange={e=>setNq({...nq,text:e.target.value})} placeholder="Nhập nội dung câu hỏi..."/></div>
               <div><label className="text-xs font-medium text-slate-600 mb-2 block">Các đáp án (chọn đáp án đúng)</label>
                 <div className="space-y-2">
-                  {['A','B','C','D'].map((lt,i)=>(
+                  {nq.opts.map((opt,i)=>(
                     <div key={i} className="flex items-center gap-2">
-                      <button onClick={()=>setNq({...nq,ans:i})} className={`w-7 h-7 rounded-full flex-shrink-0 border-2 flex items-center justify-center text-xs font-bold transition-all ${nq.ans===i?'border-emerald-600 bg-emerald-600 text-white':'border-slate-300 text-slate-400 hover:border-emerald-500'}`}>{lt}</button>
-                      <input className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm" value={nq.opts[i]} onChange={e=>{const o=[...nq.opts];o[i]=e.target.value;setNq({...nq,opts:o});}} placeholder={`Đáp án ${lt}`}/>
+                      <button type="button" onClick={()=>setNq({...nq,ans:i})} className={`w-7 h-7 rounded-full flex-shrink-0 border-2 flex items-center justify-center text-xs font-bold transition-all ${nq.ans===i?'border-emerald-600 bg-emerald-600 text-white':'border-slate-300 text-slate-400 hover:border-emerald-500'}`}>{OPT_LETTERS[i]}</button>
+                      <input className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm" value={opt} onChange={e=>{const o=[...nq.opts];o[i]=e.target.value;setNq({...nq,opts:o});}} placeholder={`Đáp án ${OPT_LETTERS[i]}`}/>
+                      {nq.opts.length>2 && <button type="button" title="Xóa phương án" onClick={()=>setNq(prev=>{
+                        const opts=prev.opts.filter((_,j)=>j!==i);
+                        const ans=prev.ans===i?0:(prev.ans>i?prev.ans-1:prev.ans);
+                        return {...prev,opts,ans};
+                      })} className="text-slate-300 hover:text-red-500"><X size={15}/></button>}
                     </div>
                   ))}
+                  {nq.opts.length<MAX_OPTS && <button type="button" onClick={()=>setNq({...nq,opts:[...nq.opts,'']})} className="text-xs text-emerald-700 hover:text-emerald-800 font-medium">+ Thêm phương án</button>}
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={()=>{setModal(false);setCustomTopic('');setNq({topic:'Nội quy',level:'Dễ',text:'',opts:['','','',''],ans:0});}} className="flex-1 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
-                <button onClick={add} className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">Thêm câu hỏi</button>
+                <button onClick={resetQuestionForm} className="flex-1 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
+                <button onClick={saveQuestion} className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">{editingId!==null?'Lưu thay đổi':'Thêm câu hỏi'}</button>
               </div>
             </div>
           </div>
@@ -601,7 +778,10 @@ LƯU Ý:
                   ))}
                 </div>
               </div>
-              <button onClick={()=>setQuestions(p=>p.filter(x=>x.id!==q.id))} className="text-slate-300 hover:text-red-400 flex-shrink-0 mt-1"><Trash2 size={16}/></button>
+              <div className="flex items-center gap-1 flex-shrink-0 mt-1">
+                <button title="Sửa câu hỏi" onClick={()=>openEdit(q)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600"><FileText size={14}/></button>
+                <button title="Xóa câu hỏi" onClick={()=>setQuestions(p=>p.filter(x=>x.id!==q.id))} className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500"><Trash2 size={14}/></button>
+              </div>
             </div>
           </div>
         ))}
@@ -1669,7 +1849,7 @@ const EmblemSvg = ({size=100}) => {
 
 // Quốc huy: ưu tiên file ảnh trong public/, không có thì tự vẽ bằng SVG.
 // Đặt file của bạn vào public/ với một trong các tên dưới đây (hoặc sửa lại danh sách).
-const EMBLEM_SRCS = ['/quochuy.svg', '/quochuy.png', '/quochuy.jpg', '/quochuy.webp'];
+const EMBLEM_SRCS = ['/cuchckt.jpg'];
 const Emblem = ({size=100, className=''}) => {
   const [tried, setTried] = useState(0);
   if (tried >= EMBLEM_SRCS.length) return <EmblemSvg size={size}/>;
@@ -1755,7 +1935,7 @@ const Login = ({onLogin, employees}) => {
         {/* HEADER */}
         <div className="text-center">
           <div className="flex justify-center"><Emblem size={128}/></div>
-          <h1 className="mt-3 text-xl sm:text-1xl font-bold text-[#0B4F32] tracking-tight">ĐOÀN KINH TẾ - QUỐC PHÒNG 92</h1>
+          <h1 className="mt-3 text-xl sm:text-1xl font-bold text-[#0B4F32] tracking-tight">CỤC HẬU CẦN KỸ THUẬT QUÂN KHU 4</h1>
           <p className="mt-1.5 text-slate-600 text-sm">BAN TỔ CHỨC HỘI THI BÍ THƯ CHI BỘ NĂM 2026</p>
           <StarDivider/>
         </div>
