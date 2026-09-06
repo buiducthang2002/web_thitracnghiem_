@@ -1674,7 +1674,7 @@ const MyResults = ({user, exams, results}) => {
 
 // ── EXAM SCREEN ──
 const ExamScreen = ({user, exam, questions, onFinish}) => {
-  const qs = exam.qIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
+  const [qs] = useState(() => exam.qIds.map(id => questions.find(q => q.id === id)).filter(Boolean));
   const [cur, setCur] = useState(0);
   const [ans, setAns] = useState(Array(qs.length).fill(-1));
   const [tLeft, setTLeft] = useState(exam.time*60);
@@ -1689,7 +1689,7 @@ const ExamScreen = ({user, exam, questions, onFinish}) => {
     const correct = a.filter((x,i)=>x===qs[i].ans).length;
     const score = Math.round(correct/qs.length*100);
     const timeTaken = exam.time*60 - tLeft; // seconds used
-    onFinish({id:Date.now(),empId:user.id,examId:exam.id,score,correct,timeTaken,date:new Date().toLocaleDateString('vi-VN'),answers:[...a]});
+    onFinish({id:Date.now(),empId:user.id,examId:exam.id,score,correct,timeTaken,date:new Date().toLocaleDateString('vi-VN'),answers:[...a],questionSnapshot:qs.map(q=>({id:q.id,text:q.text,opts:[...q.opts],ans:q.ans}))});
   };
 
   useEffect(()=>{
@@ -1910,7 +1910,8 @@ const BackBtn = ({onClick}) => (
 );
 
 const Login = ({onLogin, employees}) => {
-  const [step, setStep] = useState('role'); // 'role' | 'admin' | 'dept' | 'employee'
+  const [step, setStep] = useState('role'); // 'role' | 'admin' | 'candidatePassword' | 'dept' | 'employee'
+  const [candidateForm, setCandidateForm] = useState({pass:'', err:''});
   const [adminForm, setAdminForm] = useState({user:'', pass:'', err:''});
   const [selectedDept, setSelectedDept] = useState('');
 
@@ -1925,7 +1926,21 @@ const Login = ({onLogin, employees}) => {
     }
   };
 
-  const back = (to) => { setStep(to); setAdminForm({user:'',pass:'',err:''}); setSelectedDept(''); };
+  const handleCandidateLogin = (event) => {
+    event.preventDefault();
+    if (!/^[0-9]{4}$/.test(candidateForm.pass)) {
+      setCandidateForm(f=>({...f, err:'Vui lòng nhập mật khẩu gồm đúng 4 chữ số.'}));
+      return;
+    }
+    if (candidateForm.pass !== '2026') {
+      setCandidateForm(f=>({...f, err:'Mật khẩu không đúng. Vui lòng thử lại.'}));
+      return;
+    }
+    setCandidateForm({pass:'', err:''});
+    setStep('dept');
+  };
+
+  const back = (to) => { setStep(to); setAdminForm({user:'',pass:'',err:''}); setCandidateForm({pass:'',err:''}); setSelectedDept(''); };
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-4 sm:p-8">
@@ -1948,7 +1963,7 @@ const Login = ({onLogin, employees}) => {
               {[
                 {key:'admin', em:'👔', tt:'Quản trị viên', sub:'Quản lý câu hỏi, đề thi & báo cáo', to:'admin',
                  tile:'bg-emerald-100', ring:'hover:border-emerald-300', dot:'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600'},
-                {key:'emp',   em:'👤', tt:'Thí sinh',     sub:'Tham gia thi và xem kết quả',      to:'dept',
+                {key:'emp',   em:'👤', tt:'Thí sinh',     sub:'Tham gia thi và xem kết quả',      to:'candidatePassword',
                  tile:'bg-violet-100', ring:'hover:border-violet-300',  dot:'bg-violet-50 text-violet-700 group-hover:bg-violet-600'},
               ].map(item=>(
                 <button key={item.key} onClick={()=>setStep(item.to)}
@@ -1966,6 +1981,37 @@ const Login = ({onLogin, employees}) => {
                   </div>
                 </button>
               ))}
+            </div>
+          )}
+
+          {step==='candidatePassword' && (
+            <div>
+              <BackBtn onClick={()=>back('role')}/>
+              <form onSubmit={handleCandidateLogin} noValidate className="bg-white border border-slate-200/80 shadow-sm rounded-2xl p-5 sm:p-6 space-y-4">
+                <div>
+                  <h2 className="text-[#0B4F32] font-bold">Thí sinh</h2>
+                  <p className="text-slate-500 text-sm mt-1">Vui lòng nhập mật khẩu 4 số để vào trang thi.</p>
+                </div>
+                <div>
+                  <label htmlFor="candidate-password" className="text-slate-600 text-xs mb-1.5 block font-medium">Mật khẩu</label>
+                  <input
+                    id="candidate-password"
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={4}
+                    autoFocus
+                    aria-invalid={Boolean(candidateForm.err)}
+                    aria-describedby={candidateForm.err ? 'candidate-password-error' : undefined}
+                    className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 text-sm placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition"
+                    placeholder="Nhập mật khẩu 4 số"
+                    value={candidateForm.pass}
+                    onChange={e=>setCandidateForm({pass:e.target.value.replace(/[^0-9]/g, '').slice(0,4), err:''})}
+                  />
+                </div>
+                {candidateForm.err && <p id="candidate-password-error" role="alert" className="text-red-600 text-sm">{candidateForm.err}</p>}
+                <button type="submit" className="w-full bg-gradient-to-r from-[#0B4F32] to-emerald-600 hover:from-[#0a4429] hover:to-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-emerald-900/15 transition-all">Vào trang thi</button>
+              </form>
             </div>
           )}
 
@@ -2068,8 +2114,9 @@ const Login = ({onLogin, employees}) => {
 
 // ── MAIN APP ──
 // ── EXAM RESULTS (admin): pick an exam → list every attempt for it ──
-const ExamResults = ({results, exams, employees, onClearAll}) => {
+const ExamResults = ({results, exams, employees, questions, onClearAll}) => {
   const [selId, setSelId] = useState(null);
+  const [attemptId, setAttemptId] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const fmtTime = (t) => t!=null ? `${Math.floor(t/60)}p${String(t%60).padStart(2,'0')}s` : '--';
 
@@ -2129,6 +2176,52 @@ const ExamResults = ({results, exams, employees, onClearAll}) => {
   const totalQ = exam?.qIds?.length || 0;
   const rows = results.filter(r=>r.examId===selId).sort((a,b)=>b.id-a.id);
 
+  const attempt = rows.find(r=>r.id===attemptId);
+  if (attempt) {
+    const emp = employees.find(e=>e.id===attempt.empId);
+    const hasSnapshot = Array.isArray(attempt.questionSnapshot);
+    const reviewQuestions = hasSnapshot ? attempt.questionSnapshot : (exam?.qIds || []).map(id=>questions.find(q=>q.id===id));
+    const answers = Array.isArray(attempt.answers) ? attempt.answers : [];
+    // Legacy submissions stored only answer positions. Missing questions make that mapping ambiguous.
+    const canMap = hasSnapshot || (reviewQuestions.every(Boolean) && reviewQuestions.length===answers.length);
+    return (
+      <div>
+        <button onClick={()=>setAttemptId(null)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-emerald-600 mb-3"><ArrowLeft size={15}/>Quay lại danh sách kết quả</button>
+        <h1 className="text-lg md:text-xl font-bold text-slate-800">Bài thi của {emp?.name || 'Thí sinh đã xóa'}</h1>
+        <p className="text-slate-500 text-sm mt-1 mb-4">{exam?.title || 'Đề thi đã xóa'} • {attempt.date} • {fmtTime(attempt.timeTaken)} • {attempt.score}% • {attempt.correct} câu đúng</p>
+
+        {!canMap || answers.length===0 ? (
+          <p className="bg-white border border-slate-200 rounded-xl p-5 text-slate-600">Không đủ dữ liệu để đối chiếu từng câu trả lời của bài thi này.</p>
+        ) : (
+          <div className="space-y-4">
+            {reviewQuestions.map((q,index)=>{
+              const selected = answers[index];
+              const answered = Number.isInteger(selected) && selected>=0 && selected<q.opts.length;
+              const correct = answered && selected===q.ans;
+              return (
+                <section key={index} className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h2 className="font-semibold text-slate-800">Câu {index+1}</h2>
+                    <span className={`text-xs font-medium ${correct?'text-emerald-700':answered?'text-red-600':'text-slate-500'}`}>{correct?'Đúng':answered?'Sai':selected===-1?'Chưa trả lời':'Không có dữ liệu trả lời'}</span>
+                  </div>
+                  <p className="text-slate-800 whitespace-pre-wrap mb-3">{q.text}</p>
+                  <div className="space-y-2">
+                    {q.opts.map((option,i)=>(
+                      <div key={i} className={`border rounded-lg p-3 text-sm whitespace-pre-wrap ${i===q.ans?'bg-emerald-50 border-emerald-300 text-emerald-900':i===selected?'bg-red-50 border-red-300 text-red-800':'border-slate-200 text-slate-600'}`}>
+                        <span className="font-semibold">{OPT_LETTERS[i]}. </span>{option}
+                        {(i===selected || i===q.ans) && <span className="block text-xs font-semibold mt-1">{[i===selected?'Thí sinh đã chọn':null,i===q.ans?'Đáp án đúng':null].filter(Boolean).join(' • ')}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const exportExcel = () => {
     const head = ['Họ và tên','Đơn vị','Điểm (%)','Số câu đúng','Tổng câu','Kết quả','Thời gian làm bài','Ngày thi'];
     const body = rows.map(r=>{
@@ -2175,7 +2268,7 @@ const ExamResults = ({results, exams, employees, onClearAll}) => {
                 const ok=exam&&r.score>=exam.pass;
                 return (
                   <tr key={r.id} className="border-t border-slate-50 hover:bg-slate-50/50">
-                    <td className="px-3 py-2 text-xs text-slate-700 font-medium">{emp?.name||<span className="text-slate-400 italic">(Đã xóa)</span>}</td>
+                    <td className="px-3 py-2 text-xs font-medium"><button onClick={()=>setAttemptId(r.id)} className="text-emerald-700 hover:text-emerald-900 hover:underline text-left"><span className="block">{emp?.name || '(Đã xóa)'}</span><span className="text-xs font-normal">Xem bài làm</span></button></td>
                     <td className="px-3 py-2 text-xs text-slate-600">{emp?.dept||'--'}</td>
                     <td className="px-3 py-2 text-xs font-bold text-slate-800">{r.score}%</td>
                     <td className="px-3 py-2 text-xs text-slate-600">{r.correct}/{totalQ}</td>
@@ -2334,7 +2427,7 @@ export default function App() {
     dashboard: <Reports results={results} exams={exams} employees={employees}/>,
     questions: <Questions questions={questions} setQuestions={setQuestionsSync}/>,
     exams:     <Exams exams={exams} setExams={setExamsSync} questions={questions}/>,
-    results:   <ExamResults results={results} exams={exams} employees={employees} onClearAll={()=>setResultsSync([])}/>,
+    results:   <ExamResults results={results} exams={exams} employees={employees} questions={questions} onClearAll={()=>setResultsSync([])}/>,
     employees: <EmployeesView employees={employees} setEmployees={setEmployeesSync} results={results} exams={exams}/>,
   };
   const empViews = {
