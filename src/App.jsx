@@ -6,10 +6,25 @@ import JSZip from "jszip";
 import confetti from "canvas-confetti";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { BookOpen, Users, FileText, BarChart2, LogOut, Plus, Trash2, Clock, CheckCircle, Award, Home, Play, TrendingUp, TrendingDown, X, ChevronRight, Shield, ShieldCheck, Star, ArrowRight, ArrowLeft, Upload, Download, AlertCircle, Info, FileSearch, PieChart as PieChartIcon, Lock, LockOpen, Eye, EyeOff, User } from "lucide-react";
-import { db, missingConfig, projectId } from "./firebase";
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
+import { db, auth, missingConfig, projectId, toEmail, genPassword, createLoginAccount } from "./firebase";
+import { collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, where } from "firebase/firestore";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
 
-const COL = { employees:'employees', questions:'questions', exams:'exams', results:'results' };
+const COL = { employees:'employees', questions:'questions', exams:'exams', results:'results', users:'users' };
+
+// Thông báo lỗi đăng nhập thân thiện từ mã lỗi Firebase Auth
+const authErrorMessage = err => {
+  switch (err && err.code) {
+    case 'auth/invalid-credential':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-email':    return 'Tài khoản hoặc mật khẩu không đúng.';
+    case 'auth/too-many-requests': return 'Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.';
+    case 'auth/network-request-failed': return 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.';
+    case 'auth/operation-not-allowed': return 'Chưa bật đăng nhập Email/Mật khẩu trong Firebase Authentication.';
+    default: return `Đăng nhập thất bại (${(err && (err.code || err.message)) || 'lỗi không xác định'}).`;
+  }
+};
 
 // Nhãn phương án trả lời. Firestore rules cho phép 2–10 phương án mỗi câu.
 const OPT_LETTERS = 'ABCDEFGHIJ';
@@ -67,7 +82,128 @@ const orderedQuestions = (qs) => [...qs].sort((a,b)=>{
 
 
 // ── SIDEBAR (desktop) + MOBILE NAV ──
-const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
+// ── Modal hiển thị tài khoản/mật khẩu vừa cấp (mật khẩu chỉ hiện ở đây, không lưu ở đâu) ──
+const CredentialsModal = ({data, onClose}) => {
+  const {creds, fails} = data;
+  const download = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Họ và tên', 'Đơn vị', 'Tên đăng nhập', 'Mật khẩu'],
+      ...creds.map(c => [c.name, c.dept, c.account, c.password]),
+    ]);
+    ws['!cols'] = [{wch:28},{wch:22},{wch:18},{wch:14}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tai khoan');
+    XLSX.writeFile(wb, 'tai-khoan-dang-nhap.xlsx');
+  };
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="font-bold text-slate-800">Tài khoản đăng nhập vừa cấp</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+        </div>
+        <div className="p-5 space-y-3 overflow-auto">
+          {creds.length > 0 && (
+            <>
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5"/>
+                <span className="text-amber-800 text-xs">Mật khẩu chỉ hiển thị một lần này và không được lưu ở đâu. Hãy tải file Excel để gửi cho thí sinh trước khi đóng.</span>
+              </div>
+              <div className="border border-slate-100 rounded-xl overflow-auto max-h-72">
+                <table className="w-full min-w-[480px]">
+                  <thead><tr className="bg-slate-50 border-b border-slate-100">
+                    {['Họ và tên','Đơn vị','Tên đăng nhập','Mật khẩu'].map(h=><th key={h} className="px-4 py-2 text-xs font-semibold text-slate-400 text-left">{h}</th>)}
+                  </tr></thead>
+                  <tbody>{creds.map((c,i)=>(
+                    <tr key={i} className="border-t border-slate-50">
+                      <td className="px-4 py-2 text-sm text-slate-800">{c.name}</td>
+                      <td className="px-4 py-2 text-xs text-slate-500">{c.dept}</td>
+                      <td className="px-4 py-2 text-sm font-mono text-slate-600">{c.account}</td>
+                      <td className="px-4 py-2 text-sm font-mono font-semibold text-slate-800">{c.password}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </>
+          )}
+          {fails.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+              <p className="text-red-700 text-xs font-semibold mb-1">{fails.length} tài khoản không cấp được:</p>
+              <ul className="text-red-600 text-xs space-y-0.5 max-h-32 overflow-auto">
+                {fails.map((f,i)=><li key={i}>{f.emp.name}{f.emp.account ? ` (${f.emp.account})` : ''} — {f.reason}</li>)}
+              </ul>
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            {creds.length > 0 && <button onClick={download} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 flex items-center justify-center gap-2"><Download size={15}/>Tải file Excel</button>}
+            <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Đóng</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Modal đổi mật khẩu của chính người đang đăng nhập ──
+const ChangePasswordModal = ({onClose}) => {
+  const [oldPw, setOldPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [newPw2, setNewPw2] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const submit = async e => {
+    e.preventDefault();
+    if (!oldPw) return setErr('Vui lòng nhập mật khẩu hiện tại.');
+    if (newPw.length < 6) return setErr('Mật khẩu mới phải có ít nhất 6 ký tự.');
+    if (newPw !== newPw2) return setErr('Hai lần nhập mật khẩu mới không khớp.');
+    if (newPw === oldPw) return setErr('Mật khẩu mới phải khác mật khẩu hiện tại.');
+    setBusy(true);
+    try {
+      const u = auth.currentUser;
+      await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, oldPw));
+      await updatePassword(u, newPw);
+      setDone(true);
+    } catch (ex) {
+      setErr(ex.code === 'auth/invalid-credential' || ex.code === 'auth/wrong-password'
+        ? 'Mật khẩu hiện tại không đúng.'
+        : `Không đổi được mật khẩu (${ex.code || ex.message}).`);
+    }
+    setBusy(false);
+  };
+
+  const inputCls = 'w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-emerald-500';
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="font-bold text-slate-800">Đổi mật khẩu</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+        </div>
+        {done ? (
+          <div className="p-5 space-y-4">
+            <p className="text-sm text-emerald-700">Đã đổi mật khẩu thành công.</p>
+            <button onClick={onClose} className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700">Đóng</button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="p-5 space-y-3" autoComplete="off">
+            <input type="password" className={inputCls} placeholder="Mật khẩu hiện tại" value={oldPw} onChange={e=>{setOldPw(e.target.value);setErr('');}} autoFocus/>
+            <input type="password" className={inputCls} placeholder="Mật khẩu mới (tối thiểu 6 ký tự)" value={newPw} onChange={e=>{setNewPw(e.target.value);setErr('');}}/>
+            <input type="password" className={inputCls} placeholder="Nhập lại mật khẩu mới" value={newPw2} onChange={e=>{setNewPw2(e.target.value);setErr('');}}/>
+            {err && <p role="alert" className="text-red-600 text-xs">{err}</p>}
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
+              <button type="submit" disabled={busy} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">{busy?'Đang đổi...':'Đổi mật khẩu'}</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const Sidebar = ({role, active, setActive, user, onLogout, onChangePw, rail, setRail}) => {
   const nav = role==='admin'
     ? [{id:'dashboard',ic:<Home size={18}/>,lb:'Tổng quan'},{id:'questions',ic:<BookOpen size={18}/>,lb:'Câu hỏi'},{id:'exams',ic:<FileText size={18}/>,lb:'Đề thi'},{id:'results',ic:<Award size={18}/>,lb:'Kết quả'},{id:'employees',ic:<Users size={18}/>,lb:'Thí sinh'},{id:'accounts',ic:<ShieldCheck size={18}/>,lb:'Tài khoản'}]
     : [{id:'home',ic:<Home size={18}/>,lb:'Trang chủ'},{id:'results',ic:<Award size={18}/>,lb:'Kết quả'}];
@@ -101,6 +237,7 @@ const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
           </div>
           <div className={`flex items-center ${rail?'flex-col gap-1.5':'justify-between'} mt-1.5`}>
             <button onClick={onLogout} title="Đăng xuất" className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><LogOut size={15}/></button>
+            <button onClick={onChangePw} title="Đổi mật khẩu" className="p-1.5 rounded-lg text-slate-400 hover:text-[#0B4F32] hover:bg-emerald-50 transition-colors"><Lock size={15}/></button>
             <button onClick={()=>setRail(r=>!r)} title={rail?'Mở rộng':'Thu gọn'} className="p-1.5 rounded-lg text-slate-400 hover:text-[#0B4F32] hover:bg-emerald-50 transition-colors">
               <ChevronRight size={16} className={rail?'':'rotate-180'}/>
             </button>
@@ -119,6 +256,7 @@ const Sidebar = ({role, active, setActive, user, onLogout, rail, setRail}) => {
         </div>
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-slate-600 text-xs truncate">{user.name.split(' ').pop()}</span>
+          <button onClick={onChangePw} title="Đổi mật khẩu" className="text-slate-400 hover:text-[#0B4F32] p-1"><Lock size={15}/></button>
           <button onClick={onLogout} className="text-slate-400 hover:text-red-500 p-1"><LogOut size={15}/></button>
         </div>
       </div>
@@ -1059,7 +1197,12 @@ const Exams = ({exams, setExams, questions}) => {
 };
 
 // ── EMPLOYEES ──
-const EmployeesView = ({employees, setEmployees, results, exams}) => {
+const EmployeesView = ({employees, setEmployees, results, exams, onProvision}) => {
+  const [creds, setCreds] = useState(null);   // kết quả cấp tài khoản để hiện cho admin
+  const runProvision = async (emps, replace=false) => {
+    const r = await onProvision(emps, replace);
+    if (r.creds.length || r.fails.length) setCreds(r);
+  };
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', emp} | {mode:'delete', emp}
@@ -1104,13 +1247,17 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
       if(dup) return setFormErr('Thí sinh này đã tồn tại trong hệ thống');
       const dupAcc = employees.find(e=>e.account===account);
       if(dupAcc) return setFormErr('Tài khoản này đã được sử dụng');
-      setEmployees(p=>[...p, {id:Date.now(), name, dept, account}]);
+      const newEmp = {id:Date.now(), name, dept, account};
+      setEmployees(p=>[...p, newEmp]);
+      runProvision([newEmp]);
     } else {
       const dup = employees.find(e=>e.name.toLowerCase()===name.toLowerCase() && e.id!==modal.emp.id);
       if(dup) return setFormErr('Tên này đã được dùng cho thí sinh khác');
       const dupAcc = employees.find(e=>e.account===account && e.id!==modal.emp.id);
       if(dupAcc) return setFormErr('Tài khoản này đã được sử dụng');
       setEmployees(p=>p.map(e=>e.id===modal.emp.id?{...e,name,dept,account}:e));
+      // Đổi tên đăng nhập → cấp tài khoản mới (mật khẩu mới), thu hồi tài khoản cũ
+      if(account !== (modal.emp.account||'')) runProvision([{...modal.emp, name, dept, account}], true);
     }
     closeModal();
   };
@@ -1163,7 +1310,7 @@ const EmployeesView = ({employees, setEmployees, results, exams}) => {
         added.push({id: Date.now() + Math.random(), name: nameRaw, dept: deptRaw || 'Chưa phân công', account: phoneRaw});
       });
 
-      if(added.length > 0) setEmployees(p => [...p, ...added]);
+      if(added.length > 0) { setEmployees(p => [...p, ...added]); runProvision(added); }
       const totalSkipped = Object.values(skipReasons).reduce((a,b) => a+b, 0);
       const skipMsg = totalSkipped > 0 ? ` — ${skipReasons.header} header, ${skipReasons.empty} tên trống, ${skipReasons.khoi} khối, ${skipReasons.dupName} trùng tên` : '';
       setImportResult({added: added.length, skipped: skipped.length, totalSkipped, skipMsg, review: skipped.slice(0, 10)});
@@ -1232,6 +1379,7 @@ const downloadTemplate = () => {
   // ── Render ──
   return (
     <div>
+      {creds && <CredentialsModal data={creds} onClose={()=>setCreds(null)}/>}
       {/* Modal Thêm / Sửa */}
       {(modal?.mode==='add' || modal?.mode==='edit') && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -2288,35 +2436,26 @@ const Emblem = ({size=100, className=''}) => {
 };
 
 // Nền: sóng xanh + watermark trụ sở và ngôi sao
-const Login = ({onLogin, employees}) => {
+const Login = ({onLogin, externalErr}) => {
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState('');
   const [remember, setRemember] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
     const acc = account.trim();
     if (!acc) { setErr('Vui lòng nhập tài khoản.'); return; }
     if (!password) { setErr('Vui lòng nhập mật khẩu.'); return; }
-
-    if (acc === 'admin' && password === '123') {
-      onLogin({role:'admin', id:0, name:'Quản trị viên', dept:'Admin'}, remember);
-      return;
+    setBusy(true);
+    try {
+      await onLogin(acc, password, remember);   // thành công → App tự chuyển màn hình
+    } catch (ex) {
+      setErr(authErrorMessage(ex));
     }
-
-    const emp = employees.find(e => e.account === acc);
-    if (emp) {
-      if (password !== emp.account) {
-        setErr('Mật khẩu không đúng. Vui lòng thử lại.');
-        return;
-      }
-      onLogin({role:'employee', ...emp}, remember);
-      return;
-    }
-
-    setErr('Tài khoản hoặc mật khẩu không đúng.');
+    setBusy(false);
   };
 
   return (
@@ -2381,10 +2520,10 @@ const Login = ({onLogin, employees}) => {
             </button>
           </div>
 
-          {err && <p role="alert" className="text-red-600 text-sm">{err}</p>}
+          {(err || externalErr) && <p role="alert" className="text-red-600 text-sm">{err || externalErr}</p>}
 
-          <button type="submit" className="w-full bg-[#0B4F32] hover:bg-[#0a4429] text-white py-2.5 rounded-lg font-semibold transition-colors">
-            Đăng nhập
+          <button type="submit" disabled={busy} className="w-full bg-[#0B4F32] hover:bg-[#0a4429] disabled:opacity-60 text-white py-2.5 rounded-lg font-semibold transition-colors">
+            {busy ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>
 
@@ -2581,10 +2720,23 @@ const ExamResults = ({results, exams, employees, questions, onClearAll}) => {
 };
 
 // ── ACCOUNTS (Quản lý tài khoản) ──
-const Accounts = ({employees, setEmployees}) => {
+const Accounts = ({employees, setEmployees, authUsers, onProvision}) => {
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({name:'', oldAccount:'', newAccount:''});
   const [formErr, setFormErr] = useState('');
+  const [creds, setCreds] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const hasLogin = emp => authUsers.some(u => u.role === 'employee' && String(u.empId) === String(emp.id) && u.account === (emp.account||''));
+  const missing = employees.filter(e => (e.account||'').trim() && !hasLogin(e));
+
+  const runProvision = async (emps, replace=false) => {
+    setBusy(true);
+    try {
+      const r = await onProvision(emps, replace);
+      if (r.creds.length || r.fails.length) setCreds(r);
+    } finally { setBusy(false); }
+  };
 
   const openEdit = (emp) => {
     setForm({name:emp.name, oldAccount:emp.account||'', newAccount:emp.account||''});
@@ -2597,12 +2749,16 @@ const Accounts = ({employees, setEmployees}) => {
     if(!newAccount) return setFormErr('Tài khoản không được để trống');
     const dup = employees.find(e=>e.account===newAccount && e.id!==modal.emp.id);
     if(dup) return setFormErr('Tài khoản này đã được sử dụng');
+    if(newAccount === (modal.emp.account||'')) return setFormErr('Tài khoản mới phải khác tài khoản cũ');
     setEmployees(p=>p.map(e=>e.id===modal.emp.id?{...e,account:newAccount}:e));
+    // Tên đăng nhập đổi → cấp tài khoản mới (mật khẩu mới), thu hồi tài khoản cũ
+    runProvision([{...modal.emp, account:newAccount}], true);
     setModal(null);
   };
 
   return (
     <div>
+      {creds && <CredentialsModal data={creds} onClose={()=>setCreds(null)}/>}
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
@@ -2643,9 +2799,16 @@ const Accounts = ({employees, setEmployees}) => {
         </div>
       )}
 
-      <div className="mb-5">
-        <h1 className="text-lg md:text-xl font-bold text-slate-800">Quản lý tài khoản</h1>
-        <p className="text-slate-500 text-xs md:text-sm mt-0.5">{employees.length} tài khoản</p>
+      <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg md:text-xl font-bold text-slate-800">Quản lý tài khoản</h1>
+          <p className="text-slate-500 text-xs md:text-sm mt-0.5">{employees.length} thí sinh · {missing.length} chưa được cấp tài khoản đăng nhập</p>
+        </div>
+        {missing.length > 0 && (
+          <button disabled={busy} onClick={()=>runProvision(missing)} className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
+            {busy ? 'Đang cấp...' : `Cấp tài khoản cho ${missing.length} thí sinh`}
+          </button>
+        )}
       </div>
 
       {employees.length === 0 ? (
@@ -2655,7 +2818,7 @@ const Accounts = ({employees, setEmployees}) => {
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/50">
-                {['Thí sinh','Đơn vị','Tài khoản','Mật khẩu','Thao tác'].map(h=>(
+                {['Thí sinh','Đơn vị','Tài khoản','Đăng nhập','Thao tác'].map(h=>(
                   <th key={h} className="px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide text-left">{h}</th>
                 ))}
               </tr>
@@ -2666,9 +2829,18 @@ const Accounts = ({employees, setEmployees}) => {
                   <td className="px-5 py-3 text-sm font-medium text-slate-800">{emp.name}</td>
                   <td className="px-5 py-3 text-xs text-slate-500">{emp.dept}</td>
                   <td className="px-5 py-3 text-sm font-mono text-slate-600">{emp.account||'--'}</td>
-                  <td className="px-5 py-3 text-sm font-mono text-slate-600">1</td>
+                  <td className="px-5 py-3 text-xs">
+                    {hasLogin(emp)
+                      ? <span className="text-emerald-600 font-medium">Đã cấp</span>
+                      : <span className="text-amber-600 font-medium">Chưa cấp</span>}
+                  </td>
                   <td className="px-5 py-3">
-                    <button onClick={()=>openEdit(emp)} className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-medium hover:bg-emerald-100">Đổi tài khoản</button>
+                    <div className="flex gap-2">
+                      <button onClick={()=>openEdit(emp)} className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-medium hover:bg-emerald-100">Đổi tài khoản</button>
+                      {!hasLogin(emp) && (emp.account||'').trim() && (
+                        <button disabled={busy} onClick={()=>runProvision([emp])} className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-200 disabled:opacity-60">Cấp tài khoản</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -2688,6 +2860,9 @@ export default function App() {
   const [questions, setQuestions] = useState([]);
   const [exams, setExams] = useState([]);
   const [results, setResults] = useState([]);
+  const [authUsers, setAuthUsers] = useState([]);   // collection users (chỉ admin đọc được)
+  const [authError, setAuthError] = useState('');
+  const [showChangePw, setShowChangePw] = useState(false);
   const [activeExam, setActiveExam] = useState(null);
   const [pendingExam, setPendingExam] = useState(null);
   const [lastResult, setLastResult] = useState(null);
@@ -2699,37 +2874,97 @@ export default function App() {
 
   // Bản sao mới nhất của từng collection, dùng để tính diff khi ghi (không đọc từ
   // state trong updater — xem makeSyncSetter).
-  const dataRef = useRef({ employees: [], questions: [], exams: [], results: [] });
+  const dataRef = useRef({ employees: [], questions: [], exams: [], results: [], users: [] });
+  const unsubsRef = useRef([]);
 
-  // ── Realtime sync từ Firebase ──
-  useEffect(() => {
-    const unsubs = [];
-    let loadCount = 0;
-    const TOTAL = 4;
-    const sub = (colName, setter) => {
+  const stopData = () => { unsubsRef.current.forEach(u => u()); unsubsRef.current = []; };
+  const resetData = () => {
+    dataRef.current = { employees: [], questions: [], exams: [], results: [], users: [] };
+    setEmployees([]); setQuestions([]); setExams([]); setResults([]); setAuthUsers([]);
+  };
+
+  // Đăng ký realtime các nguồn dữ liệu; xong lần tải đầu của tất cả thì tắt "Đang tải".
+  // sources: [{ key, ref (collection hoặc query), setter }]
+  const subscribeAll = (sources) => {
+    let loaded = 0;
+    sources.forEach(({ key, ref, setter }) => {
       let first = true;
-      const unsub = onSnapshot(collection(db, colName),
+      const unsub = onSnapshot(ref,
         snap => {
-          const list = snap.docs.map(d => ({ ...d.data(), id: d.data().id || d.id }));
-          dataRef.current[colName] = list;
+          const list = snap.docs.map(d => ({ ...d.data(), id: d.data().id ?? d.id }));
+          dataRef.current[key] = list;
           setter(list);
-          if (first) { first = false; loadCount++; if (loadCount >= TOTAL) setLoading(false); }
+          if (first) { first = false; loaded++; if (loaded >= sources.length) setLoading(false); }
         },
         err => {
           // Không có callback này thì listener chết âm thầm: màn hình đứng ở "Đang tải"
           // hoặc hiện dữ liệu cũ trong cache mà không ai biết là đã mất kết nối.
-          console.error(`[Firestore] Lỗi đọc "${colName}":`, err);
-          setDbError(`Không đọc được dữ liệu "${colName}" từ máy chủ (${err.code || err.message}).`);
+          console.error(`[Firestore] Lỗi đọc "${key}":`, err);
+          setDbError(`Không đọc được dữ liệu "${key}" từ máy chủ (${err.code || err.message}).`);
           setLoading(false);
         });
-      unsubs.push(unsub);
-    };
-    sub(COL.employees, setEmployees);
-    sub(COL.questions, setQuestions);
-    sub(COL.exams, setExams);
-    sub(COL.results, setResults);
-    return () => unsubs.forEach(u => u());
+      unsubsRef.current.push(unsub);
+    });
+  };
+
+  // ── Đăng nhập: Firebase Auth quyết định ai đang đăng nhập, collection `users/{uid}` quyết định vai trò ──
+  useEffect(() => {
+    if (missingConfig.length) { setLoading(false); return; }
+    let seq = 0;   // bỏ qua kết quả của lượt xử lý cũ nếu trạng thái đăng nhập đổi liên tục
+    const unsubAuth = onAuthStateChanged(auth, async fbUser => {
+      const mine = ++seq;
+      stopData(); resetData();
+      if (!fbUser) { setUser(null); setLoading(false); return; }
+      setLoading(true);
+      try {
+        const prof = await getDoc(doc(db, COL.users, fbUser.uid));
+        if (mine !== seq) return;
+        if (!prof.exists()) throw new Error('NO_PROFILE');
+        const { role, empId } = prof.data();
+        if (role === 'admin') {
+          setUser({ role: 'admin', id: 0, name: 'Quản trị viên', dept: 'Admin', uid: fbUser.uid });
+          setView('dashboard');
+          subscribeAll([
+            { key: 'employees', ref: collection(db, COL.employees), setter: setEmployees },
+            { key: 'questions', ref: collection(db, COL.questions), setter: setQuestions },
+            { key: 'exams',     ref: collection(db, COL.exams),     setter: setExams },
+            { key: 'results',   ref: collection(db, COL.results),   setter: setResults },
+            { key: 'users',     ref: collection(db, COL.users),     setter: setAuthUsers },
+          ]);
+        } else if (role === 'employee') {
+          const emp = await getDoc(doc(db, COL.employees, String(empId)));
+          if (mine !== seq) return;
+          if (!emp.exists()) throw new Error('NO_PROFILE');
+          setUser({ role: 'employee', ...emp.data(), id: empId, uid: fbUser.uid });
+          setView('home');
+          subscribeAll([
+            { key: 'questions', ref: collection(db, COL.questions), setter: setQuestions },
+            { key: 'exams',     ref: collection(db, COL.exams),     setter: setExams },
+            // Chỉ tải kết quả của chính mình (rules cũng chặn đọc của người khác)
+            { key: 'results',   ref: query(collection(db, COL.results), where('empId', '==', empId)), setter: setResults },
+          ]);
+        } else {
+          throw new Error('NO_PROFILE');
+        }
+      } catch (err) {
+        if (mine !== seq) return;
+        console.error('[Auth] Không tải được hồ sơ:', err);
+        setAuthError(err.message === 'NO_PROFILE'
+          ? 'Tài khoản này chưa được cấp quyền sử dụng hệ thống. Vui lòng liên hệ quản trị viên.'
+          : `Không tải được hồ sơ người dùng (${err.code || err.message}).`);
+        setUser(null); setLoading(false);
+        signOut(auth).catch(() => {});
+      }
+    });
+    return () => { seq++; unsubAuth(); stopData(); };
   }, []);
+
+  const login = async (account, password, remember) => {
+    setAuthError('');
+    await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+    await signInWithEmailAndPassword(auth, toEmail(account), password);
+  };
+  const logout = () => { setActiveExam(null); setPendingExam(null); setLastResult(null); signOut(auth).catch(() => {}); };
 
   // ── Firebase write helpers ──
   // Firestore từ chối giá trị undefined và không nhận mảng lồng mảng → dọn trước khi ghi.
@@ -2773,41 +3008,48 @@ export default function App() {
     prev.forEach(item => { if (!next.find(e => e.id === item.id)) fbDel(colName, item.id).catch(()=>{}); });
   };
 
-  const setEmployeesSync = makeSyncSetter(COL.employees, setEmployees);
   const setQuestionsSync = makeSyncSetter(COL.questions, setQuestions);
   const setExamsSync     = makeSyncSetter(COL.exams, setExams);
   const setResultsSync   = makeSyncSetter(COL.results, setResults);
 
-  // Phiên đăng nhập: chỉ lưu role + id (không lưu mật khẩu). "Ghi nhớ" → localStorage,
-  // không ghi nhớ → sessionStorage (mất khi đóng tab).
-  const SESSION_KEY = 'tn_session';
-  const readSession = () => {
-    for (const s of ['localStorage', 'sessionStorage']) {
-      try { const v = window[s].getItem(SESSION_KEY); if (v) return JSON.parse(v); } catch { /* bị chặn storage */ }
-    }
-    return null;
-  };
-  const clearSession = () => {
-    for (const s of ['localStorage', 'sessionStorage']) { try { window[s].removeItem(SESSION_KEY); } catch { /* bỏ qua */ } }
-  };
-  const login = (u, remember) => {
-    clearSession();
-    try { (remember ? localStorage : sessionStorage).setItem(SESSION_KEY, JSON.stringify({role:u.role, id:u.id})); } catch { /* bỏ qua */ }
-    setUser(u); setView(u.role==="admin"?"dashboard":"home");
-  };
-  const logout    = () => { clearSession(); setUser(null); setActiveExam(null); setLastResult(null); };
+  // Thu hồi quyền đăng nhập của thí sinh: xoá doc users tương ứng (rules sẽ chặn ngay mọi truy cập).
+  const revokeLogins = (empId) => Promise.all(
+    dataRef.current.users
+      .filter(u => u.role === 'employee' && String(u.empId) === String(empId))
+      .map(u => fbDel(COL.users, u.id).catch(() => {}))
+  );
 
-  // Tự đăng nhập lại khi mở app, sau khi danh sách thí sinh đã tải xong
-  const restoredRef = useRef(false);
-  useEffect(() => {
-    if (loading || restoredRef.current) return;
-    restoredRef.current = true;
-    const s = readSession();
-    if (!s) return;
-    if (s.role === 'admin') { setUser({role:'admin', id:0, name:'Quản trị viên', dept:'Admin'}); setView('dashboard'); return; }
-    const emp = employees.find(e => String(e.id) === String(s.id));
-    if (emp) { setUser({role:'employee', ...emp}); setView('home'); } else clearSession();
-  }, [loading]);
+  // Xoá thí sinh → thu hồi luôn tài khoản đăng nhập của họ
+  const setEmployeesSync = (updater) => {
+    const prev = dataRef.current.employees;
+    makeSyncSetter(COL.employees, setEmployees)(updater);
+    const next = dataRef.current.employees;
+    prev.filter(e => !next.some(n => n.id === e.id)).forEach(e => revokeLogins(e.id));
+  };
+
+  // Cấp tài khoản đăng nhập (Firebase Auth) cho danh sách thí sinh, mỗi người một mật khẩu ngẫu nhiên.
+  // Trả về { creds: [{name,dept,account,password}], fails: [{emp,reason}] } để admin xem/tải về.
+  const provisionLogins = async (emps) => {
+    const creds = [], fails = [];
+    for (const emp of emps) {
+      const account = (emp.account || '').trim();
+      if (!account) { fails.push({ emp, reason: 'Chưa có tên đăng nhập' }); continue; }
+      const password = genPassword();
+      try {
+        const oldLogins = dataRef.current.users.filter(u => u.role === 'employee' && String(u.empId) === String(emp.id));
+        const uid = await createLoginAccount(account, password);
+        await fbSet(COL.users, { id: uid, role: 'employee', empId: emp.id, account });
+        // Chỉ thu hồi quyền cũ SAU khi tài khoản mới đã tạo xong (lỗi giữa chừng không làm mất đăng nhập đang dùng)
+        await Promise.all(oldLogins.map(u => fbDel(COL.users, u.id).catch(() => {})));
+        creds.push({ name: emp.name, dept: emp.dept, account, password });
+      } catch (err) {
+        fails.push({ emp, reason: err.code === 'auth/email-already-in-use'
+          ? 'Tên đăng nhập này đã tồn tại trong hệ thống đăng nhập (cần xoá/đặt lại bằng scripts/adminTools.mjs)'
+          : (err.code || err.message) });
+      }
+    }
+    return { creds, fails };
+  };
   const startExam = exam => {
     // Mỗi thí sinh chỉ được thi mỗi đề một lần
     if (results.some(r => r.empId === user.id && r.examId === exam.id)) return;
@@ -2848,7 +3090,7 @@ export default function App() {
     </div>
   );
 
-  if (!user) return <>{banner}<Login onLogin={login} employees={employees}/></>;
+  if (!user) return <>{banner}<Login onLogin={login} externalErr={authError}/></>;
   if (pendingExam) return <>{banner}<SessionCodeModal exam={pendingExam} onConfirm={()=>{setActiveExam(pendingExam);setPendingExam(null);}} onCancel={()=>setPendingExam(null)}/></>;
   if (activeExam) return <>{banner}<ExamScreen user={user} exam={activeExam} questions={questions} onFinish={finishExam}/></>;
   if (lastResult) {
@@ -2861,8 +3103,8 @@ export default function App() {
     questions: <Questions questions={questions} setQuestions={setQuestionsSync}/>,
     exams:     <Exams exams={exams} setExams={setExamsSync} questions={questions}/>,
     results:   <ExamResults results={results} exams={exams} employees={employees} questions={questions} onClearAll={()=>setResultsSync([])}/>,
-    employees: <EmployeesView employees={employees} setEmployees={setEmployeesSync} results={results} exams={exams}/>,
-    accounts:  <Accounts employees={employees} setEmployees={setEmployeesSync}/>,
+    employees: <EmployeesView employees={employees} setEmployees={setEmployeesSync} results={results} exams={exams} onProvision={provisionLogins}/>,
+    accounts:  <Accounts employees={employees} setEmployees={setEmployeesSync} authUsers={authUsers} onProvision={provisionLogins}/>,
   };
   const empViews = {
     home:    <EmpHome user={user} exams={exams} results={results} onStart={startExam}/>,
@@ -2872,7 +3114,8 @@ export default function App() {
   return (
     <div className="flex bg-slate-50 min-h-screen">
       {banner}
-      <Sidebar role={user.role} active={view} setActive={setView} user={user} onLogout={logout} rail={rail} setRail={setRail}/>
+      {showChangePw && <ChangePasswordModal onClose={()=>setShowChangePw(false)}/>}
+      <Sidebar role={user.role} active={view} setActive={setView} user={user} onLogout={logout} onChangePw={()=>setShowChangePw(true)} rail={rail} setRail={setRail}/>
       <div className={`flex-1 ${rail?'md:ml-[78px]':'md:ml-[168px]'} overflow-auto pt-14 md:pt-0 pb-16 md:pb-0 transition-[margin] duration-200`}>
         <div className="p-3 sm:p-4 md:p-7">{user.role==="admin"?adminViews[view]:empViews[view]}</div>
       </div>

@@ -1,9 +1,9 @@
 // src/firebase.js
-// ⚠️  Thay toàn bộ giá trị bên dưới bằng config Firebase của bạn
-// Lấy tại: Firebase Console → Project Settings → Your apps → SDK setup
+// Cấu hình lấy từ file .env (xem .env.example)
 
-import { initializeApp } from 'firebase/app'
+import { initializeApp, getApps } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,3 +21,32 @@ export const projectId = firebaseConfig.projectId
 
 const app = initializeApp(firebaseConfig)
 export const db = getFirestore(app)
+export const auth = getAuth(app)
+
+// Tên đăng nhập → email nội bộ cho Firebase Auth (người dùng không bao giờ thấy email này).
+// Tên có ký tự lạ (dấu, khoảng trắng...) được mã hoá hex để luôn là email hợp lệ.
+const AUTH_DOMAIN_SUFFIX = '@quiz.local'
+export const toEmail = account => {
+  const a = String(account).trim().toLowerCase()
+  if (/^[a-z0-9._-]+$/.test(a)) return a + AUTH_DOMAIN_SUFFIX
+  const hex = Array.from(new TextEncoder().encode(a)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return 'x' + hex + AUTH_DOMAIN_SUFFIX
+}
+
+// Mật khẩu ngẫu nhiên, bỏ ký tự dễ nhầm (0/O, 1/l/I)
+export const genPassword = (len = 8) => {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const buf = crypto.getRandomValues(new Uint32Array(len))
+  return Array.from(buf, n => chars[n % chars.length]).join('')
+}
+
+// Tạo tài khoản đăng nhập cho thí sinh mà KHÔNG đăng xuất admin: dùng một app Firebase
+// thứ hai chỉ để gọi createUser (createUser tự đăng nhập tài khoản vừa tạo vào app đó).
+export const createLoginAccount = async (account, password) => {
+  const secondary = getApps().find(a => a.name === 'secondary') || initializeApp(firebaseConfig, 'secondary')
+  const secAuth = getAuth(secondary)
+  const cred = await createUserWithEmailAndPassword(secAuth, toEmail(account), password)
+  const uid = cred.user.uid
+  await signOut(secAuth)
+  return uid
+}

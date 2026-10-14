@@ -7,3 +7,7 @@ dist/
 # Tài liệu nguồn (ngân hàng câu hỏi, đề thi) - không đưa lên repo public
 *.docx
 *.doc
+
+# Khoá quản trị Firebase — tuyệt đối không commit
+serviceAccount*.json
+*-firebase-adminsdk-*.json

@@ -3,6 +3,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { readFileSync } from "fs";
 
 // Đọc .env thủ công
@@ -29,6 +30,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+
+// Rules yêu cầu đăng nhập admin: ADMIN_ACCOUNT=... ADMIN_PASSWORD=... node seed.mjs
+if (!process.env.ADMIN_ACCOUNT || !process.env.ADMIN_PASSWORD) {
+  console.error("❌ Thiếu ADMIN_ACCOUNT / ADMIN_PASSWORD (tài khoản admin của web).");
+  process.exit(1);
+}
+await signInWithEmailAndPassword(getAuth(app), process.env.ADMIN_ACCOUNT.trim().toLowerCase() + "@quiz.local", process.env.ADMIN_PASSWORD);
 
 // ── Dữ liệu mẫu ──────────────────────────────────────────
 

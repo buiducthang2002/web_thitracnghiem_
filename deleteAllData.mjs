@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getFirestore, collection, getDocs, deleteDoc, doc } from 'firebase/firestore'
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth'
 import fs from 'fs'
 
 // Đọc .env file
@@ -23,6 +24,13 @@ console.log('🔥 Kết nối Firebase:', firebaseConfig.projectId)
 
 const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
+
+// Rules yêu cầu đăng nhập admin: ADMIN_ACCOUNT=... ADMIN_PASSWORD=... node deleteAllData.mjs
+if (!process.env.ADMIN_ACCOUNT || !process.env.ADMIN_PASSWORD) {
+  console.error('❌ Thiếu ADMIN_ACCOUNT / ADMIN_PASSWORD (tài khoản admin của web).')
+  process.exit(1)
+}
+await signInWithEmailAndPassword(getAuth(app), process.env.ADMIN_ACCOUNT.trim().toLowerCase() + '@quiz.local', process.env.ADMIN_PASSWORD)
 
 const collections = ['employees', 'questions', 'exams', 'results']
 
